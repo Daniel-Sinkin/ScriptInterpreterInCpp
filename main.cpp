@@ -1,14 +1,14 @@
 
 #include <cassert>
 #include <expected>
+#include <functional>
+#include <optional>
 #include <print>
 #include <string>
+#include <string_view>
+#include <unordered_map>
 #include <variant>
 #include <vector>
-#include <unordered_map>
-#include <string_view> 
-#include <functional> 
-#include <optional>
 
 using i64 = int64_t;
 using u64 = uint64_t;
@@ -25,10 +25,16 @@ bool is_whitespace(char c)
 
 enum class TokenOperator
 {
-    Plus,  // +
-    Minus, // -
-    Star,  // *
-    Slash  // /
+    Plus,             // +
+    Minus,            // -
+    Star,             // *
+    Slash,            // /
+    Equal,            // =
+    GreaterThan,      // >
+    LessThan,         // <
+    GreaterEqualThan, // >=
+    LessEqualThan,    // <=
+    DoubleEqual,      // ==
 };
 
 struct TokenIdentifier
@@ -41,7 +47,8 @@ struct TokenInteger
     int64_t value;
 };
 
-enum class TokenKeyword {
+enum class TokenKeyword
+{
     Let,
     If,
     Then,
@@ -53,6 +60,16 @@ using Token = std::variant<TokenOperator, TokenIdentifier, TokenInteger, TokenKe
 constexpr bool char_is_digit(char c) noexcept
 {
     return c >= '0' && c <= '9';
+}
+
+bool word_is_ascii(std::string_view s)
+{
+    for (char c : s)
+    {
+        if (c < 'A' || (c > 'Z' && c < 'a') || c > 'z')
+            return false;
+    }
+    return true;
 }
 
 enum class StringToIntError
@@ -91,15 +108,30 @@ std::expected<i64, StringToIntError> string_to_i64(const std::string &word) noex
     return {is_negative ? -retval : retval};
 }
 
-
 constexpr std::string_view to_string(TokenOperator op) noexcept
 {
     switch (op)
     {
-        case TokenOperator::Plus:  return "Plus";
-        case TokenOperator::Minus: return "Minus";
-        case TokenOperator::Star:  return "Star";
-        case TokenOperator::Slash: return "Slash";
+    case TokenOperator::Plus:
+        return "Plus";
+    case TokenOperator::Minus:
+        return "Minus";
+    case TokenOperator::Star:
+        return "Star";
+    case TokenOperator::Slash:
+        return "Slash";
+    case TokenOperator::Equal:
+        return "Equal";
+    case TokenOperator::GreaterThan:
+        return "GreaterThan";
+    case TokenOperator::LessThan:
+        return "LessThan";
+    case TokenOperator::GreaterEqualThan:
+        return "GreaterEqualThan";
+    case TokenOperator::LessEqualThan:
+        return "LessEqualThan";
+    case TokenOperator::DoubleEqual:
+        return "DoubleEqual";
     }
     return "UnknownOp";
 }
@@ -108,17 +140,22 @@ constexpr std::string_view to_string(TokenKeyword kw) noexcept
 {
     switch (kw)
     {
-        case TokenKeyword::Let:  return "Let";
-        case TokenKeyword::If:   return "If";
-        case TokenKeyword::Then: return "Then";
-        case TokenKeyword::Else: return "Else";
+    case TokenKeyword::Let:
+        return "Let";
+    case TokenKeyword::If:
+        return "If";
+    case TokenKeyword::Then:
+        return "Then";
+    case TokenKeyword::Else:
+        return "Else";
     }
     return "UnknownKw";
 }
 
-static std::string token_to_string(const Token& tok)
+static std::string token_to_string(const Token &tok)
 {
-    return std::visit([](const auto& t) -> std::string {
+    return std::visit([](const auto &t) -> std::string
+        {
         using TT = std::decay_t<decltype(t)>;
 
         if constexpr (std::is_same_v<TT, TokenOperator>)
@@ -140,11 +177,10 @@ static std::string token_to_string(const Token& tok)
         else
         {
             return "UnknownToken";
-        }
-    }, tok);
+        } }, tok);
 }
 
-static void print_tokens(const std::vector<Token>& toks)
+static void print_tokens(const std::vector<Token> &toks)
 {
     std::print("[");
     for (std::size_t i = 0; i < toks.size(); ++i)
@@ -155,7 +191,7 @@ static void print_tokens(const std::vector<Token>& toks)
     std::println("]");
 }
 
-static void print_expressions(const std::vector<std::vector<Token>>& exprs)
+static void print_expressions(const std::vector<std::vector<Token>> &exprs)
 {
     for (std::size_t i = 0; i < exprs.size(); ++i)
     {
@@ -164,21 +200,138 @@ static void print_expressions(const std::vector<std::vector<Token>>& exprs)
     }
 }
 
-class RuntimeContext {
+struct AssignmentExpression
+{
+    std::string identifier;
+    i64 value;
+};
+using Expression = std::variant<AssignmentExpression>;
+
+class RuntimeContext
+{
 public:
     [[nodiscard]]
     std::optional<i64>
-    variable_by_name(const std::string& name) const noexcept {
+    variable_by_name(const std::string &name) const noexcept
+    {
         auto it = m_variables.find(name);
-        if(it == m_variables.end()) return std::nullopt;
+        if (it == m_variables.end()) return std::nullopt;
         return it->second;
     }
-    void set_variable(std::string name, i64 value) {
-        m_variables.insert_or_assign(name, value);
+    void process_expression_assignment(AssignmentExpression expr)
+    { // TODO: Use visitor pattern
+        set_variable(expr.identifier, expr.value);
     }
+
 private:
     std::unordered_map<std::string, i64> m_variables; // Later this should be a map into value types
+    void set_variable(std::string name, i64 value)
+    {
+        m_variables.insert_or_assign(name, value);
+    }
 };
+
+enum class ParseTokenError
+{
+    Empty,
+    InvalidIntegerDigit,
+    IntegerOverflow,
+    StartsWithZero,
+    FallThrough,
+    IdentifierIsNotAscii
+};
+constexpr std::string_view to_string(ParseTokenError e) noexcept
+{
+    switch (e)
+    {
+    case ParseTokenError::Empty:
+        return "Empty";
+    case ParseTokenError::InvalidIntegerDigit:
+        return "InvalidIntegerDigit";
+    case ParseTokenError::IntegerOverflow:
+        return "IntegerOverflow";
+    case ParseTokenError::StartsWithZero:
+        return "StartsWithZero";
+    case ParseTokenError::FallThrough:
+        return "FallThrough";
+    case ParseTokenError::IdentifierIsNotAscii:
+        return "IdentifierIsNotAscii";
+    }
+    return "UnknownParseTokenError";
+}
+
+constexpr std::string_view explain(ParseTokenError e) noexcept
+{
+    switch (e)
+    {
+    case ParseTokenError::Empty:
+        return "Encountered an empty token where input was expected.";
+    case ParseTokenError::InvalidIntegerDigit:
+        return "Integer literal contains a non-digit character.";
+    case ParseTokenError::IntegerOverflow:
+        return "Integer literal is too large to fit into a 64-bit signed integer.";
+    case ParseTokenError::StartsWithZero:
+        return "Integer literal has a leading zero, which is not allowed.";
+    case ParseTokenError::FallThrough:
+        return "Token could not be classified into any known category.";
+    case ParseTokenError::IdentifierIsNotAscii:
+        return "Identifier contains non-ASCII alphabetic characters.";
+    }
+    return "Unknown token parsing error.";
+}
+
+[[nodiscard]]
+std::expected<Token, ParseTokenError>
+parse_token(std::string word)
+{
+    using E = ParseTokenError;
+    if (word.empty()) return std::unexpected{E::Empty};
+    if ((word[0] == '-' && word.length() > 1) || (char_is_digit(word[0])))
+    {
+        auto res = string_to_i64(word);
+        if (!res)
+        {
+            using EE = StringToIntError;
+            switch (res.error())
+            {
+            case EE::Overflow:
+                return std::unexpected{E::IntegerOverflow};
+            case EE::StartsWithZero:
+                return std::unexpected{E::StartsWithZero};
+            case EE::InvalidDigit:
+                return std::unexpected{E::InvalidIntegerDigit};
+            case EE::Empty:
+                assert(false && "Empty error in inner token parse should not happen.");
+            }
+        }
+        return TokenInteger{res.value()};
+    }
+    else
+    {
+        // clang-format off
+        if      (word == "+"   ) return TokenOperator::Plus;
+        else if (word == "-"   ) return TokenOperator::Minus;
+        else if (word == "*"   ) return TokenOperator::Star;
+        else if (word == "/"   ) return TokenOperator::Slash;
+        else if (word == "="   ) return TokenOperator::Equal;
+        else if (word == "=="  ) return TokenOperator::DoubleEqual;
+        else if (word == "<"   ) return TokenOperator::LessThan;
+        else if (word == ">"   ) return TokenOperator::GreaterThan;
+        else if (word == ">="  ) return TokenOperator::GreaterEqualThan;
+        else if (word == "<="  ) return TokenOperator::LessEqualThan;
+        else if (word == "let" ) return TokenKeyword::Let;
+        else if (word == "if"  ) return TokenKeyword::If;
+        else if (word == "else") return TokenKeyword::Else;
+        else if (word == "then") return TokenKeyword::Then;
+        else
+        { // Identifer
+            if (!word_is_ascii(word)) return std::unexpected{E::IdentifierIsNotAscii};
+            return TokenIdentifier{word};
+        }
+        // clang-format on
+    }
+    assert(false && "Fallthrough in parse_token");
+}
 
 int main()
 {
@@ -188,12 +341,8 @@ int main()
     std::println("The code:\n{}\n", code);
 
     std::vector<ExpressionTokens> expressions;
-    std::vector<std::vector<std::string>> expression_words;
-    // TODO: Prolly can just have views / ranges instead of copying?
     {
-        std::vector<std::string> words;
         std::vector<Token> tokens;
-        std::println("Starting to parse words:");
         size_t start_idx = 0;
         while (start_idx < code.length()) // Each iteration is one word, whitespace trimmed
         {
@@ -222,73 +371,24 @@ int main()
             assert(curr_idx > start_idx);
             auto word_diff = curr_idx - start_idx;
             auto word = code.substr(start_idx, word_diff);
-
-            if (word.empty())
+            auto res = parse_token(word);
+            if (!res)
             {
-                std::println("Can't parse empty words!");
+                std::println(
+                    "Failed to parse token '{}', got error TokenParseError::{} ('{}')",
+                    word,
+                    to_string(res.error()),
+                    explain(res.error())
+                    );
                 return 1;
             }
-            Token token;
-            if (word.length() == 1) // This must be an operator or a single positive digit
-            {
-                char c = word[0];
-                if(char_is_digit(c)) {
-                    token = TokenInteger{c - '0'};
-                } else {
-                    switch(c) {
-                        case '+':
-                            token = TokenOperator::Plus;
-                            break;
-                        case '-':
-                            token = TokenOperator::Minus;
-                            break;
-                        case '*':
-                            token = TokenOperator::Star;
-                            break;
-                        case '/':
-                            token = TokenOperator::Slash;
-                            break;
-                        default:
-                            token = TokenIdentifier{word};
-                            break;
-                    }
-                }
-            }
-            else if (word[0] == '-' || (char_is_digit(word[0])))
-            {
-                auto res = string_to_i64(word);
-                if (!res)
-                {
-                    std::println("Failed to parse integer {}!", word);
-                    return 1;
-                }
-                token = TokenInteger{res.value()};
-            }
-            else // Keyword or Identifier
-            {
-                if(word == "let") {
-                    token = TokenKeyword::Let;
-                } else if (word == "if") {
-                    token = TokenKeyword::If;
-                } else if (word == "else") {
-                    token = TokenKeyword::Else;
-                } else if (word == "then") {
-                    token = TokenKeyword::Then;
-                } else { // Identifer
-                    token = TokenIdentifier{word};
-                }
-            }
-
-            tokens.push_back(token);
-            words.push_back(word);
+            tokens.push_back(res.value());
 
             if (found_semicolon)
             {
                 ++curr_idx;
                 expressions.push_back(std::move(tokens));
-                expression_words.push_back(std::move(words));
                 tokens = {};
-                words = {};
             }
             start_idx = curr_idx;
         }
@@ -297,16 +397,4 @@ int main()
 
     std::println("Found {} expressions:", expressions.size());
     print_expressions(expressions);
-
-    std::println("\nParsing results:");
-    for (size_t expr_id = 0; expr_id < expressions.size(); ++expr_id)
-    {
-        const auto& words = expression_words[expr_id];
-        const auto& toks  = expressions[expr_id];
-
-        for (size_t tid = 0; tid < words.size(); ++tid)
-        {
-            std::println("  {:10} -> {}", words[tid], token_to_string(toks[tid]));
-        }
-    }
 }
