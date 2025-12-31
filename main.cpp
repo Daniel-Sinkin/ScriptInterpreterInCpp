@@ -14,11 +14,10 @@
 using i64 = int64_t;
 using u64 = uint64_t;
 
-
 std::string_view get_code()
 {
     // String literals have static storage duration so this can return a view without issues
-    return "let x = 10;\nif x > 5 then x + 1 else 0;";
+    return "let x = 10;\nif x > 5 then x + 1 else 0;\nlet y = x + 1;";
 }
 
 bool char_is_whitespace(char c)
@@ -59,7 +58,7 @@ enum class TokenKeyword
 };
 
 using Token = std::variant<TokenOperator, TokenIdentifier, TokenInteger, TokenKeyword>;
-using ExpressionTokens = std::vector<Token>;
+using Tokens = std::vector<Token>;
 
 constexpr bool char_is_digit(char c) noexcept
 {
@@ -198,12 +197,34 @@ static void print_tokens(const std::vector<Token> &toks)
     std::println("]");
 }
 
-struct AssignmentExpression
+struct AssignmentStatement
 {
     std::string identifier;
     i64 value;
 };
-using Expression = std::variant<AssignmentExpression>;
+
+struct Expression; // forward declaration
+struct ValueExpression
+{
+    i64 value;
+};
+
+struct VariableExpression
+{
+    std::string name;
+};
+
+struct BinaryExpression
+{
+    TokenOperator op;
+    std::unique_ptr<Expression> exp1;
+    std::unique_ptr<Expression> exp2;
+};
+struct Expression
+{
+    using ExpressionVariant = std::variant<ValueExpression, VariableExpression, BinaryExpression>;
+    ExpressionVariant node;
+};
 
 class RuntimeContext
 {
@@ -216,11 +237,10 @@ public:
         if (it == m_variables.end()) return std::nullopt;
         return it->second;
     }
-    void process_expression_assignment(AssignmentExpression expr)
-    { // TODO: Use visitor pattern
+    void process_assignment_statement(AssignmentStatement expr)
+    {
         set_variable(expr.identifier, expr.value);
     }
-
 private:
     std::unordered_map<std::string, i64> m_variables; // Later this should be a map into value types
     void set_variable(std::string name, i64 value)
@@ -229,7 +249,64 @@ private:
     }
 };
 
-enum class ParseTokenError
+enum class EvaluateExpressionError{
+    InvalidExpression, // Catch all
+    UnsupportedOperator,
+    MissingExpression,
+    MissingVariable,
+    DivisionByZero
+};
+[[nodiscard]]
+std::expected<i64, EvaluateExpressionError>
+evaluate_expression(const Expression& expr, const RuntimeContext& ctx)
+{
+    using E = EvaluateExpressionError;
+    return std::visit([&ctx](const auto& e) -> std::expected<i64, EvaluateExpressionError> {
+        using TT = std::decay_t<decltype(e)>;
+        if constexpr (std::is_same_v<TT, BinaryExpression>) {
+            if(!e.exp1) return std::unexpected{E::MissingExpression};
+            auto res1 = evaluate_expression(*e.exp1, ctx);
+            if(!res1) {
+                return std::unexpected{res1.error()};
+            }
+            if(!e.exp2) return std::unexpected{E::MissingExpression};
+            auto res2 = evaluate_expression(*e.exp2, ctx);
+            if(!res2) {
+                return std::unexpected{res2.error()};
+            }
+            switch(e.op) { // Maybe should have seperate BinaryArithmeic and so on Operators
+                case TokenOperator::Plus:
+                    return *res1 + *res2;
+                case TokenOperator::Minus:
+                    return *res1 - *res2;
+                case TokenOperator::Star:
+                    return (*res1) * (*res2);
+                case TokenOperator::Slash:
+                    if (*res2 == 0) return std::unexpected{E::DivisionByZero};
+                    return *res1 / *res2;
+                case TokenOperator::Equal:
+                case TokenOperator::GreaterThan:
+                case TokenOperator::LessThan:
+                case TokenOperator::GreaterEqualThan:
+                case TokenOperator::LessEqualThan:
+                case TokenOperator::DoubleEqual:
+                    return std::unexpected{E::UnsupportedOperator};
+            }
+        } 
+        else if constexpr (std::is_same_v<TT, ValueExpression>)
+        {
+            return e.value;
+        }
+        else if constexpr (std::is_same_v<TT, VariableExpression>)
+        {
+            auto res = ctx.variable_by_name(e.name);
+            if(!res.has_value()) return std::unexpected{E::MissingVariable};
+            return *res;
+        }
+    }, expr.node);
+}
+
+enum class TokenizeWordError
 {
     Empty,
     InvalidIntegerDigit,
@@ -238,51 +315,51 @@ enum class ParseTokenError
     FallThrough,
     IdentifierIsNotAscii
 };
-constexpr std::string_view to_string(ParseTokenError e) noexcept
+constexpr std::string_view to_string(TokenizeWordError e) noexcept
 {
     switch (e)
     {
-    case ParseTokenError::Empty:
+    case TokenizeWordError::Empty:
         return "Empty";
-    case ParseTokenError::InvalidIntegerDigit:
+    case TokenizeWordError::InvalidIntegerDigit:
         return "InvalidIntegerDigit";
-    case ParseTokenError::IntegerOverflow:
+    case TokenizeWordError::IntegerOverflow:
         return "IntegerOverflow";
-    case ParseTokenError::StartsWithZero:
+    case TokenizeWordError::StartsWithZero:
         return "StartsWithZero";
-    case ParseTokenError::FallThrough:
+    case TokenizeWordError::FallThrough:
         return "FallThrough";
-    case ParseTokenError::IdentifierIsNotAscii:
+    case TokenizeWordError::IdentifierIsNotAscii:
         return "IdentifierIsNotAscii";
     }
     return "UnknownParseTokenError";
 }
 
-constexpr std::string_view explain(ParseTokenError e) noexcept
+constexpr std::string_view explain(TokenizeWordError e) noexcept
 {
     switch (e)
     {
-    case ParseTokenError::Empty:
+    case TokenizeWordError::Empty:
         return "Encountered an empty token where input was expected.";
-    case ParseTokenError::InvalidIntegerDigit:
+    case TokenizeWordError::InvalidIntegerDigit:
         return "Integer literal contains a non-digit character.";
-    case ParseTokenError::IntegerOverflow:
+    case TokenizeWordError::IntegerOverflow:
         return "Integer literal is too large to fit into a 64-bit signed integer.";
-    case ParseTokenError::StartsWithZero:
+    case TokenizeWordError::StartsWithZero:
         return "Integer literal has a leading zero, which is not allowed.";
-    case ParseTokenError::FallThrough:
+    case TokenizeWordError::FallThrough:
         return "Token could not be classified into any known category.";
-    case ParseTokenError::IdentifierIsNotAscii:
+    case TokenizeWordError::IdentifierIsNotAscii:
         return "Identifier contains non-ASCII alphabetic characters.";
     }
     return "Unknown token parsing error.";
 }
 
 [[nodiscard]]
-std::expected<Token, ParseTokenError>
-parse_token(std::string_view word)
+std::expected<Token, TokenizeWordError>
+tokenize_word(std::string_view word)
 {
-    using E = ParseTokenError;
+    using E = TokenizeWordError;
     if (word.empty()) return std::unexpected{E::Empty};
     if ((word[0] == '-' && word.length() > 1) || (char_is_digit(word[0])))
     {
@@ -299,10 +376,10 @@ parse_token(std::string_view word)
             case EE::InvalidDigit:
                 return std::unexpected{E::InvalidIntegerDigit};
             case EE::Empty:
-                assert(false && "Empty error in inner token parse should not happen.");
+                assert(false && "'EmptyError' in inner token parse should not happen.");
             }
         }
-        return TokenInteger{res.value()};
+        return TokenInteger{*res};
     }
     else
     {
@@ -331,17 +408,17 @@ parse_token(std::string_view word)
     assert(false && "Fallthrough in parse_token");
 }
 
-struct ParseNextExpressionError
+struct TokenizeNextStatementError
 {
-    ParseTokenError parsing_error;
+    TokenizeWordError tokenize_error;
     size_t word_idx;
     size_t word_length;
 };
 [[nodiscard]]
-std::expected<ExpressionTokens, ParseNextExpressionError>
-parse_next_expression(std::string_view code, size_t &idx)
+std::expected<Tokens, TokenizeNextStatementError>
+tokenize_next_statement(std::string_view code, size_t &idx)
 {
-    ExpressionTokens tokens;
+    Tokens statement;
 
     while (idx < code.length() && char_is_whitespace(code[idx]))
     {
@@ -349,9 +426,9 @@ parse_next_expression(std::string_view code, size_t &idx)
     }
     if (idx >= code.length())
     {
-        // Empty Expression list is to be understood as "to skip"
+        // Empty Statement list is to be understood as "to skip"
         // Could also treat that as an error case to seperate EOF with ";;"
-        return tokens;
+        return statement;
     }
 
     while (idx < code.length())
@@ -384,26 +461,25 @@ parse_next_expression(std::string_view code, size_t &idx)
         const size_t word_diff = curr_idx - idx;
         const auto word = code.substr(idx, word_diff);
 
-        auto res = parse_token(word);
+        auto res = tokenize_word(word);
         if (!res)
         {
-            return std::unexpected(ParseNextExpressionError{
-                .parsing_error = res.error(),
+            return std::unexpected(TokenizeNextStatementError{
+                .tokenize_error = res.error(),
                 .word_idx = idx,
                 .word_length = word_diff});
         }
-
-        tokens.push_back(res.value());
+        statement.push_back(*res);
 
         idx = curr_idx;
         if (found_semicolon)
         {
             ++idx; // Skips the ';'
-            return tokens;
+            return statement;
         }
     }
 
-    return tokens;
+    return statement;
 }
 
 int main()
@@ -411,25 +487,23 @@ int main()
     std::string_view code = get_code();
     std::println("The code:\n{}\n", code);
 
-    std::vector<ExpressionTokens> expressions;
+    std::vector<Tokens> statement_tokens;
     size_t start_idx = 0;
     while (start_idx < code.length()) // Each iteration is one word, whitespace trimmed
     {
-        auto res = parse_next_expression(code, start_idx);
+        auto res = tokenize_next_statement(code, start_idx);
         if (!res)
         {
-            std::println("Failed to parse expression, get parse error code {}",
-                static_cast<int>(res.error().parsing_error));
+            std::println("Failed to parse statement, get parse error code {}",
+                static_cast<int>(res.error().tokenize_error));
             return 1;
         }
-        expressions.push_back(res.value());
+        statement_tokens.push_back(*res);
     }
-    std::println("Finished parsing words!\n");
-
-    std::println("Found {} expressions:", expressions.size());
-    for (size_t i = 0; i < expressions.size(); ++i)
+    std::println("Found {} statements:", statement_tokens.size());
+    for (size_t i = 0; i < statement_tokens.size(); ++i)
     {
-        std::print("Expr[{:2}] = ", i);
-        print_tokens(expressions[i]);
+        std::print("Statement[{:2}] = ", i);
+        print_tokens(statement_tokens[i]);
     }
 }
