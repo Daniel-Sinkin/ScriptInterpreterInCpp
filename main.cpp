@@ -20,7 +20,7 @@ using u64 = uint64_t;
 std::string_view get_code()
 {
     // String literals have static storage duration so this can return a view without issues
-    return "let x = 1;\nprint x;\nlet x = 2;\nprint x;\nlet my_var = 123;\nprint my_var;\nlet my_var = x;\nlet y = if x > 5 then x + 1 else 0;\nlet z = x + y + 1;";
+    return "let x = 1 + 1 * 3;\nprint x;\nlet x = 2;\nprint x;\nlet my_var = 123;\nprint my_var;\nlet my_var = x;\nlet y = if x > 5 then x + 1 else 0;\nlet z = x + y + 1;";
 }
 
 bool char_is_whitespace(char c)
@@ -28,15 +28,12 @@ bool char_is_whitespace(char c)
     return std::isspace(static_cast<unsigned char>(c));
 }
 
-enum class BinaryArithmeticOperator
+enum class BinaryOperator
 {
     Plus,  // +
     Minus, // -
     Star,  // *
     Slash, // /
-};
-enum class ComparisonOperator
-{
     GreaterThan,      // >
     LessThan,         // <
     GreaterEqualThan, // >=
@@ -67,7 +64,7 @@ enum class TokenKeyword
     Print
 };
 
-using Token = std::variant<BinaryArithmeticOperator, ComparisonOperator, TokenOperator, TokenIdentifier, TokenInteger, TokenKeyword>;
+using Token = std::variant<BinaryOperator, TokenOperator, TokenIdentifier, TokenInteger, TokenKeyword>;
 using Tokens = std::vector<Token>;
 
 constexpr bool char_is_digit(char c) noexcept
@@ -125,20 +122,30 @@ string_to_i64(std::string_view word) noexcept
     return {is_negative ? -retval : retval};
 }
 
-constexpr std::string_view to_string(BinaryArithmeticOperator op) noexcept
+constexpr std::string_view to_string(BinaryOperator op) noexcept
 {
     switch (op)
     {
-    case BinaryArithmeticOperator::Plus:
+    case BinaryOperator::Plus:
         return "Plus";
-    case BinaryArithmeticOperator::Minus:
+    case BinaryOperator::Minus:
         return "Minus";
-    case BinaryArithmeticOperator::Star:
+    case BinaryOperator::Star:
         return "Star";
-    case BinaryArithmeticOperator::Slash:
+    case BinaryOperator::Slash:
         return "Slash";
+    case BinaryOperator::GreaterThan:
+        return "GreaterThan";
+    case BinaryOperator::LessThan:
+        return "LessThan";
+    case BinaryOperator::GreaterEqualThan:
+        return "GreaterEqualThan";
+    case BinaryOperator::LessEqualThan:
+        return "LessEqualThan";
+    case BinaryOperator::DoubleEqual:
+        return "DoubleEqual";
     }
-    return "UnknownBinaryArithmeticOperator";
+    return "UnknownBinaryOperator";
 }
 
 constexpr std::string_view to_string(TokenOperator op) noexcept
@@ -149,24 +156,6 @@ constexpr std::string_view to_string(TokenOperator op) noexcept
         return "Equal";
     }
     return "UnknownTokenOperator";
-}
-
-constexpr std::string_view to_string(ComparisonOperator op) noexcept
-{
-    switch (op)
-    {
-    case ComparisonOperator::GreaterThan:
-        return "GreaterThan";
-    case ComparisonOperator::LessThan:
-        return "LessThan";
-    case ComparisonOperator::GreaterEqualThan:
-        return "GreaterEqualThan";
-    case ComparisonOperator::LessEqualThan:
-        return "LessEqualThan";
-    case ComparisonOperator::DoubleEqual:
-        return "DoubleEqual";
-    }
-    return "UnknownComparisonOperator";
 }
 
 constexpr std::string_view to_string(TokenKeyword kw) noexcept
@@ -193,17 +182,13 @@ static std::string token_to_string(const Token &tok)
         {
         using TT = std::decay_t<decltype(t)>;
 
-        if constexpr (std::is_same_v<TT, BinaryArithmeticOperator>)
+        if constexpr (std::is_same_v<TT, BinaryOperator>)
         {
-            return std::string{"BinaryArithmeticOperator("} + std::string{to_string(t)} + ")";
+            return std::string{"BinaryOperator("} + std::string{to_string(t)} + ")";
         }
         else if constexpr (std::is_same_v<TT, TokenOperator>)
         {
             return std::string{"TokenOperator("} + std::string{to_string(t)} + ")";
-        }
-        else if constexpr (std::is_same_v<TT, ComparisonOperator>)
-        {
-            return std::string{"ComparisonOperator("} + std::string{to_string(t)} + ")";
         }
         else if constexpr (std::is_same_v<TT, TokenKeyword>)
         {
@@ -247,17 +232,10 @@ struct VariableExpression
 
 struct BinaryExpression
 {
-    BinaryArithmeticOperator op;
+    BinaryOperator op;
     std::unique_ptr<Expression> exp1;
     std::unique_ptr<Expression> exp2;
 };
-struct ComparisonExpression
-{
-    ComparisonOperator op;
-    std::unique_ptr<Expression> exp1;
-    std::unique_ptr<Expression> exp2;
-};
-
 struct Expression
 {
     using ExpressionVariant = std::variant<ValueExpression, VariableExpression, BinaryExpression>;
@@ -336,42 +314,26 @@ evaluate_expression(const Expression &expr, const RuntimeContext &ctx)
                 return std::unexpected{res2.error()};
             }
             switch(e.op) { // Maybe should have seperate BinaryArithmeic and so on Operators
-                case BinaryArithmeticOperator::Plus:
+                case BinaryOperator::Plus:
                     return *res1 + *res2;
-                case BinaryArithmeticOperator::Minus:
+                case BinaryOperator::Minus:
                     return *res1 - *res2;
-                case BinaryArithmeticOperator::Star:
+                case BinaryOperator::Star:
                     return (*res1) * (*res2);
-                case BinaryArithmeticOperator::Slash:
+                case BinaryOperator::Slash:
                     if (*res2 == 0) return std::unexpected{E::DivisionByZero};
                     return *res1 / *res2;
+                case BinaryOperator::GreaterThan:
+                    return static_cast<i64>(*res1 > *res2);
+                case BinaryOperator::LessThan:
+                    return static_cast<i64>(*res1 < *res2);
+                case BinaryOperator::GreaterEqualThan:
+                    return static_cast<i64>(*res1 >= *res2);
+                case BinaryOperator::LessEqualThan:
+                    return static_cast<i64>(*res1 <= *res2);
+                case BinaryOperator::DoubleEqual:
+                    return static_cast<i64>(*res1 == *res2);
                 default: 
-                    return std::unexpected{E::UnsupportedOperator};
-            }
-        }
-        else if constexpr (std::is_same_v<TT, ComparisonExpression>) {
-            if(!e.exp1) return std::unexpected{E::MissingExpression};
-            auto res1 = evaluate_expression(*e.exp1, ctx);
-            if(!res1) {
-                return std::unexpected{res1.error()};
-            }
-            if(!e.exp2) return std::unexpected{E::MissingExpression};
-            auto res2 = evaluate_expression(*e.exp2, ctx);
-            if(!res2) {
-                return std::unexpected{res2.error()};
-            }
-            switch(e.op) { // Maybe should have seperate BinaryArithmeic and so on Operators
-                case ComparisonOperator::GreaterThan:
-                    return *res1 > *res2;
-                case ComparisonOperator::LessThan:
-                    return *res1 < *res2;
-                case ComparisonOperator::GreaterEqualThan:
-                    return *res1 >= *res2;
-                case ComparisonOperator::LessEqualThan:
-                    return *res1 <= *res2;
-                case ComparisonOperator::DoubleEqual:
-                    return *res1 == *res2;
-                default:
                     return std::unexpected{E::UnsupportedOperator};
             }
         }
@@ -465,16 +427,16 @@ tokenize_word(std::string_view word)
     else
     {
         // clang-format off
-        if      (word == "+"   ) return BinaryArithmeticOperator::Plus;
-        else if (word == "-"   ) return BinaryArithmeticOperator::Minus;
-        else if (word == "*"   ) return BinaryArithmeticOperator::Star;
-        else if (word == "/"   ) return BinaryArithmeticOperator::Slash;
+        if      (word == "+"   ) return BinaryOperator::Plus;
+        else if (word == "-"   ) return BinaryOperator::Minus;
+        else if (word == "*"   ) return BinaryOperator::Star;
+        else if (word == "/"   ) return BinaryOperator::Slash;
+        else if (word == "=="  ) return BinaryOperator::DoubleEqual;
+        else if (word == "<"   ) return BinaryOperator::LessThan;
+        else if (word == ">"   ) return BinaryOperator::GreaterThan;
+        else if (word == ">="  ) return BinaryOperator::GreaterEqualThan;
+        else if (word == "<="  ) return BinaryOperator::LessEqualThan;
         else if (word == "="   ) return TokenOperator::Equal;
-        else if (word == "=="  ) return ComparisonOperator::DoubleEqual;
-        else if (word == "<"   ) return ComparisonOperator::LessThan;
-        else if (word == ">"   ) return ComparisonOperator::GreaterThan;
-        else if (word == ">="  ) return ComparisonOperator::GreaterEqualThan;
-        else if (word == "<="  ) return ComparisonOperator::LessEqualThan;
         else if (word == "let" ) return TokenKeyword::Let;
         else if (word == "if"  ) return TokenKeyword::If;
         else if (word == "else") return TokenKeyword::Else;
@@ -501,7 +463,6 @@ std::expected<Tokens, TokenizeNextStatementError>
 tokenize_next_statement(std::string_view code, size_t &idx)
 {
     Tokens statement;
-
     while (idx < code.length() && char_is_whitespace(code[idx]))
     {
         ++idx;
@@ -579,104 +540,7 @@ struct PrintStatement
 // or side effects outside of the context (how function calling is handled idk, but things like printing to console)
 using Statement = std::variant<AssignmentStatement, PrintStatement>;
 
-enum class ParseExpressionError
-{
-    Generic,
-    MalformedExpression,
-    EmptyStatement,
-    NotImplemented
-};
-[[nodiscard]]
-std::expected<Expression, ParseExpressionError>
-parse_expression(std::span<const Token> tokens)
-{
-    using E = ParseExpressionError;
-    if (tokens.empty()) return std::unexpected{E::EmptyStatement};
-    if (tokens.size() > 1) return std::unexpected{E::NotImplemented};
 
-    auto tvar = std::get_if<TokenIdentifier>(&tokens[0]);
-    if(tvar)
-    {
-        return Expression{.node = VariableExpression{.name = tvar->name}};
-    }
-
-    auto tint = std::get_if<TokenInteger>(&tokens[0]);
-    if (tint)
-    {
-        return Expression{.node = ValueExpression{.value = tint->value}};
-    }
-    return std::unexpected{E::MalformedExpression};
-}
-
-enum class ParseStatementError
-{
-    NoKeywordAtStart,
-    MalformedStatement,
-    MalformedExpression,
-    InvalidKeyword,
-    EmptyStatement,
-    InvalidLength,
-    NotImplementedKeyword,
-    NotImplemented,
-    Generic
-};
-[[nodiscard]]
-std::expected<Statement, ParseStatementError>
-parse_statement(const Tokens &tokens)
-{
-    using E = ParseStatementError;
-    if (tokens.empty()) return std::unexpected{E::EmptyStatement};
-    if (auto kw = std::get_if<TokenKeyword>(&tokens[0]))
-    {
-        switch (*kw)
-        {
-        case TokenKeyword::Let:
-        {
-            if (tokens.size() < 4) return std::unexpected{E::InvalidLength};
-            auto var_name = std::get_if<TokenIdentifier>(&tokens[1]);
-            auto equals_op = std::get_if<TokenOperator>(&tokens[2]);
-            if (!var_name || !equals_op || *equals_op != TokenOperator::Equal)
-            {
-                return std::unexpected{E::MalformedStatement};
-            }
-            if (tokens.size() > 4) return std::unexpected{E::NotImplemented};
-            auto res = parse_expression(std::span{tokens}.subspan(3));
-            if (!res)
-            {
-                return std::unexpected{E::MalformedExpression};
-            }
-            return AssignmentStatement{
-                .identifier = var_name->name,
-                .expr = std::move(*res)};
-        }
-        case TokenKeyword::Print:
-        {
-            if (tokens.size() < 2) return std::unexpected{E::InvalidLength};
-            auto res = parse_expression(std::span{tokens}.subspan(1));
-            if (!res)
-            {
-                return std::unexpected{E::MalformedExpression};
-            }
-            return PrintStatement{.expr = std::move(*res)};
-        }
-        case TokenKeyword::If:
-        {
-            return std::unexpected{E::NotImplementedKeyword};
-        }
-        case TokenKeyword::Else:
-        case TokenKeyword::Then:
-        {
-            return std::unexpected{E::InvalidKeyword};
-        }
-        }
-    }
-    else
-    {
-        return std::unexpected{E::NoKeywordAtStart};
-    }
-
-    return std::unexpected{E::Generic};
-}
 
 std::vector<Tokens> tokenize_code(std::string_view code)
 {
@@ -728,6 +592,192 @@ execute_statement(RuntimeContext &ctx, const Statement &statement)
         return {}; }, statement);
 }
 
+enum class ParseExpressionError
+{
+    Generic,
+    MalformedExpression,
+    EmptyStatement,
+    NotImplemented
+};
+struct Parser {
+public:
+    std::span<const Token> m_toks;
+    size_t m_pos = 0;
+
+    [[nodiscard]] bool end_of_file() const noexcept { return m_pos >= m_toks.size(); }
+    [[nodiscard]] const Token* peek() const noexcept { return end_of_file() ? nullptr : &m_toks[m_pos]; }
+
+    [[nodiscard]] const Token& consume()
+    {
+        assert(!end_of_file());
+        return m_toks[m_pos++];
+    }
+
+    struct BpPair { int left; int right; };
+
+    [[nodiscard]] static
+    std::optional<BpPair>
+    infix_bp(const Token& tok) noexcept
+    {
+        // Return nullopt if tok is not an infix operator in expressions.
+        if (auto bop = std::get_if<BinaryOperator>(&tok))
+        {
+            switch (*bop)
+            {
+            case BinaryOperator::Star:
+            case BinaryOperator::Slash:
+                return BpPair{70, 71}; // left-assoc
+
+            case BinaryOperator::Plus:
+            case BinaryOperator::Minus:
+                return BpPair{60, 61}; // left-assoc
+
+            case BinaryOperator::GreaterThan:
+            case BinaryOperator::LessThan:
+            case BinaryOperator::GreaterEqualThan:
+            case BinaryOperator::LessEqualThan:
+                return BpPair{50, 51}; // left-assoc (non-chain in many langs; Pratt still parses)
+
+            case BinaryOperator::DoubleEqual:
+                return BpPair{40, 41}; // left-assoc
+
+            default:
+                return std::nullopt;
+            }
+        }
+        return std::nullopt;
+    }
+
+    [[nodiscard]]
+    std::expected<Expression, ParseExpressionError>
+    parse_expr(int min_bp = 0)
+    {
+        using E = ParseExpressionError;
+
+        if(end_of_file()) return std::unexpected{E::MalformedExpression};;
+
+        Expression lhs;
+        {
+            const Token& t = consume();
+
+            if(auto tid = std::get_if<TokenInteger>(&t))
+            {
+                lhs.node = ValueExpression{.value = tid->value};
+            }
+            else if (auto tvar = std::get_if<TokenIdentifier>(&t))
+            {
+                lhs.node = VariableExpression{.name = tvar->name};
+            }
+            else
+            {
+                return std::unexpected{E::NotImplemented};
+            }
+        }
+
+        while(true)
+        {
+            const Token* next = peek();
+            if(!next) break;
+
+            auto bp = infix_bp(*next);
+            if(!bp || bp->left < min_bp) break;
+
+            BinaryOperator op = std::get<BinaryOperator>(consume());
+
+            auto rhs = parse_expr(bp->right);
+            if(!rhs) return std::unexpected{rhs.error()};
+
+            BinaryExpression b{
+                .op = op,
+                .exp1 = std::make_unique<Expression>(std::move(lhs)),
+                .exp2 = std::make_unique<Expression>(std::move(*rhs)),
+            };
+            lhs.node = std::move(b);
+        }
+
+        return lhs;
+    }
+};
+
+[[nodiscard]]
+std::expected<Expression, ParseExpressionError>
+parse_expression(std::span<const Token> tokens)
+{
+    Parser p{.m_toks = tokens, .m_pos = 0};
+    auto expr = p.parse_expr(0);
+    if (!expr) return expr;
+    if (p.m_pos != tokens.size()) return std::unexpected{ParseExpressionError::MalformedExpression};
+    return expr;
+}
+enum class ParseStatementError
+{
+    NoKeywordAtStart,
+    MalformedStatement,
+    MalformedExpression,
+    InvalidKeyword,
+    EmptyStatement,
+    InvalidLength,
+    NotImplementedKeyword,
+    NotImplemented,
+    Generic
+};
+[[nodiscard]]
+std::expected<Statement, ParseStatementError>
+parse_statement(const Tokens &tokens)
+{
+    using E = ParseStatementError;
+    if (tokens.empty()) return std::unexpected{E::EmptyStatement};
+    if (auto kw = std::get_if<TokenKeyword>(&tokens[0]))
+    {
+        switch (*kw)
+        {
+        case TokenKeyword::Let:
+        {
+            if (tokens.size() < 4) return std::unexpected{E::InvalidLength};
+            auto var_name = std::get_if<TokenIdentifier>(&tokens[1]);
+            auto equals_op = std::get_if<TokenOperator>(&tokens[2]);
+            if (!var_name || !equals_op || *equals_op != TokenOperator::Equal)
+            {
+                return std::unexpected{E::MalformedStatement};
+            }
+            auto res = parse_expression(std::span{tokens}.subspan(3));
+            if (!res)
+            {
+                return std::unexpected{E::MalformedExpression};
+            }
+            return AssignmentStatement{
+                .identifier = var_name->name,
+                .expr = std::move(*res)};
+        }
+        case TokenKeyword::Print:
+        {
+            if (tokens.size() < 2) return std::unexpected{E::InvalidLength};
+            auto res = parse_expression(std::span{tokens}.subspan(1));
+            if (!res)
+            {
+                return std::unexpected{E::MalformedExpression};
+            }
+            return PrintStatement{.expr = std::move(*res)};
+        }
+        case TokenKeyword::If:
+        {
+            return std::unexpected{E::NotImplementedKeyword};
+        }
+        case TokenKeyword::Else:
+        case TokenKeyword::Then:
+        {
+            return std::unexpected{E::InvalidKeyword};
+        }
+        }
+    }
+    else
+    {
+        return std::unexpected{E::NoKeywordAtStart};
+    }
+
+    return std::unexpected{E::Generic};
+}
+
 int main()
 {
     std::string_view code = get_code();
@@ -746,10 +796,26 @@ int main()
     RuntimeContext ctx;
     std::println("Initialised Runtime");
     ctx.print();
-    for (size_t i = 0; i < 7; ++i) {
+    for (size_t i = 0; i < 1; ++i) {
         std::print("Executing the {}. statement: ", i + 1);
         print_tokens(statement_tokens[i]);
-        if (!execute_statement(ctx, *parse_statement(statement_tokens[i]))) return 1;
+
+        auto parsed_statement = parse_statement(statement_tokens[i]);
+        if(!parsed_statement) {
+            std::println(
+                "Failed to parse statement with error code {}",
+                static_cast<int>(parsed_statement.error())
+            );
+            return 1;
+        }
+        auto excuted_statement = execute_statement(ctx, *parsed_statement);
+        if (!excuted_statement) {
+            std::println(
+                "Failed to execute statement with error code {}",
+                static_cast<int>(excuted_statement.error())
+            );
+            return 1;
+        }
         ctx.print();
         std::println();
     }
