@@ -14,6 +14,7 @@
 using i64 = int64_t;
 using u64 = uint64_t;
 
+
 std::string_view get_code()
 {
     // String literals have static storage duration so this can return a view without issues
@@ -58,6 +59,7 @@ enum class TokenKeyword
 };
 
 using Token = std::variant<TokenOperator, TokenIdentifier, TokenInteger, TokenKeyword>;
+using ExpressionTokens = std::vector<Token>;
 
 constexpr bool char_is_digit(char c) noexcept
 {
@@ -80,7 +82,7 @@ enum class StringToIntError
     Empty,
     InvalidDigit,
     Overflow,
-    StartsWithZero // Maybe we drop those later and don't increase power later, but strict is good for now
+    StartsWithZero
 };
 [[nodiscard]]
 std::expected<i64, StringToIntError>
@@ -336,10 +338,10 @@ struct ParseNextExpressionError
     size_t word_length;
 };
 [[nodiscard]]
-std::expected<std::vector<Token>, ParseNextExpressionError>
+std::expected<ExpressionTokens, ParseNextExpressionError>
 parse_next_expression(std::string_view code, size_t &idx)
 {
-    std::vector<Token> tokens; // <-- fixed
+    ExpressionTokens tokens;
 
     while (idx < code.length() && char_is_whitespace(code[idx]))
     {
@@ -406,8 +408,6 @@ parse_next_expression(std::string_view code, size_t &idx)
 
 int main()
 {
-    using ExpressionTokens = std::vector<Token>;
-
     std::string_view code = get_code();
     std::println("The code:\n{}\n", code);
 
