@@ -327,7 +327,33 @@ evaluate_expression(const Expression &expr, const RuntimeContext &ctx)
                 default: 
                     return std::unexpected{E::UnsupportedOperator};
             }
-        } 
+        }
+        else if constexpr (std::is_same_v<TT, ComparisonExpression>) {
+            if(!e.exp1) return std::unexpected{E::MissingExpression};
+            auto res1 = evaluate_expression(*e.exp1, ctx);
+            if(!res1) {
+                return std::unexpected{res1.error()};
+            }
+            if(!e.exp2) return std::unexpected{E::MissingExpression};
+            auto res2 = evaluate_expression(*e.exp2, ctx);
+            if(!res2) {
+                return std::unexpected{res2.error()};
+            }
+            switch(e.op) { // Maybe should have seperate BinaryArithmeic and so on Operators
+                case ComparisonOperator::GreaterThan:
+                    return *res1 > *res2;
+                case ComparisonOperator::LessThan:
+                    return *res1 < *res2;
+                case ComparisonOperator::GreaterEqualThan:
+                    return *res1 >= *res2;
+                case ComparisonOperator::LessEqualThan:
+                    return *res1 <= *res2;
+                case ComparisonOperator::DoubleEqual:
+                    return *res1 == *res2;
+                default:
+                    return std::unexpected{E::UnsupportedOperator};
+            }
+        }
         else if constexpr (std::is_same_v<TT, ValueExpression>)
         {
             return e.value;
@@ -523,7 +549,7 @@ int main()
 
     std::vector<Tokens> statement_tokens;
     size_t start_idx = 0;
-    while (start_idx < code.length()) // Each iteration is one word, whitespace trimmed
+    while (start_idx < code.length()) // Each iteration is one statement, seperated by ';', whitespace trimmed
     {
         auto res = tokenize_next_statement(code, start_idx);
         if (!res)
