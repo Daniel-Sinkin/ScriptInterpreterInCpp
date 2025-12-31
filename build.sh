@@ -2,6 +2,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+mkdir -p build
+
 clang++ \
   -std=c++23 \
   -O3 \
@@ -23,5 +25,5 @@ clang++ \
   -Wfloat-equal \
   -Wswitch-enum \
   -fcolor-diagnostics \
-  -c main.cpp \
-  -o main.o
+  main.cpp \
+  -o build/main
