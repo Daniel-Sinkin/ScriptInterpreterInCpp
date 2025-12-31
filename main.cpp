@@ -25,18 +25,24 @@ bool char_is_whitespace(char c)
     return std::isspace(static_cast<unsigned char>(c));
 }
 
-enum class TokenOperator
+enum class BinaryArithmeticOperator
 {
-    Plus,             // +
-    Minus,            // -
-    Star,             // *
-    Slash,            // /
-    Equal,            // =
+    Plus,  // +
+    Minus, // -
+    Star,  // *
+    Slash, // /
+};
+enum class ComparisonOperator
+{
     GreaterThan,      // >
     LessThan,         // <
     GreaterEqualThan, // >=
     LessEqualThan,    // <=
     DoubleEqual,      // ==
+};
+enum class TokenOperator
+{
+    Equal, // =
 };
 
 struct TokenIdentifier
@@ -57,7 +63,7 @@ enum class TokenKeyword
     Else
 };
 
-using Token = std::variant<TokenOperator, TokenIdentifier, TokenInteger, TokenKeyword>;
+using Token = std::variant<BinaryArithmeticOperator, ComparisonOperator, TokenOperator, TokenIdentifier, TokenInteger, TokenKeyword>;
 using Tokens = std::vector<Token>;
 
 constexpr bool char_is_digit(char c) noexcept
@@ -114,32 +120,48 @@ string_to_i64(std::string_view word) noexcept
     return {is_negative ? -retval : retval};
 }
 
+constexpr std::string_view to_string(BinaryArithmeticOperator op) noexcept
+{
+    switch (op)
+    {
+    case BinaryArithmeticOperator::Plus:
+        return "Plus";
+    case BinaryArithmeticOperator::Minus:
+        return "Minus";
+    case BinaryArithmeticOperator::Star:
+        return "Star";
+    case BinaryArithmeticOperator::Slash:
+        return "Slash";
+    }
+    return "UnknownBinaryArithmeticOperator";
+}
+
 constexpr std::string_view to_string(TokenOperator op) noexcept
 {
     switch (op)
     {
-    case TokenOperator::Plus:
-        return "Plus";
-    case TokenOperator::Minus:
-        return "Minus";
-    case TokenOperator::Star:
-        return "Star";
-    case TokenOperator::Slash:
-        return "Slash";
     case TokenOperator::Equal:
         return "Equal";
-    case TokenOperator::GreaterThan:
+    }
+    return "UnknownTokenOperator";
+}
+
+constexpr std::string_view to_string(ComparisonOperator op) noexcept
+{
+    switch (op)
+    {
+    case ComparisonOperator::GreaterThan:
         return "GreaterThan";
-    case TokenOperator::LessThan:
+    case ComparisonOperator::LessThan:
         return "LessThan";
-    case TokenOperator::GreaterEqualThan:
+    case ComparisonOperator::GreaterEqualThan:
         return "GreaterEqualThan";
-    case TokenOperator::LessEqualThan:
+    case ComparisonOperator::LessEqualThan:
         return "LessEqualThan";
-    case TokenOperator::DoubleEqual:
+    case ComparisonOperator::DoubleEqual:
         return "DoubleEqual";
     }
-    return "UnknownOp";
+    return "UnknownComparisonOperator";
 }
 
 constexpr std::string_view to_string(TokenKeyword kw) noexcept
@@ -164,9 +186,17 @@ static std::string token_to_string(const Token &tok)
         {
         using TT = std::decay_t<decltype(t)>;
 
-        if constexpr (std::is_same_v<TT, TokenOperator>)
+        if constexpr (std::is_same_v<TT, BinaryArithmeticOperator>)
         {
-            return std::string{"Operator("} + std::string{to_string(t)} + ")";
+            return std::string{"BinaryArithmeticOperator("} + std::string{to_string(t)} + ")";
+        }
+        else if constexpr (std::is_same_v<TT, TokenOperator>)
+        {
+            return std::string{"TokenOperator("} + std::string{to_string(t)} + ")";
+        }
+        else if constexpr (std::is_same_v<TT, ComparisonOperator>)
+        {
+            return std::string{"ComparisonOperator("} + std::string{to_string(t)} + ")";
         }
         else if constexpr (std::is_same_v<TT, TokenKeyword>)
         {
@@ -216,10 +246,17 @@ struct VariableExpression
 
 struct BinaryExpression
 {
-    TokenOperator op;
+    BinaryArithmeticOperator op;
     std::unique_ptr<Expression> exp1;
     std::unique_ptr<Expression> exp2;
 };
+struct ComparisonExpression
+{
+    ComparisonOperator op;
+    std::unique_ptr<Expression> exp1;
+    std::unique_ptr<Expression> exp2;
+};
+
 struct Expression
 {
     using ExpressionVariant = std::variant<ValueExpression, VariableExpression, BinaryExpression>;
@@ -241,6 +278,7 @@ public:
     {
         set_variable(expr.identifier, expr.value);
     }
+
 private:
     std::unordered_map<std::string, i64> m_variables; // Later this should be a map into value types
     void set_variable(std::string name, i64 value)
@@ -249,7 +287,8 @@ private:
     }
 };
 
-enum class EvaluateExpressionError{
+enum class EvaluateExpressionError
+{
     InvalidExpression, // Catch all
     UnsupportedOperator,
     MissingExpression,
@@ -258,10 +297,11 @@ enum class EvaluateExpressionError{
 };
 [[nodiscard]]
 std::expected<i64, EvaluateExpressionError>
-evaluate_expression(const Expression& expr, const RuntimeContext& ctx)
+evaluate_expression(const Expression &expr, const RuntimeContext &ctx)
 {
     using E = EvaluateExpressionError;
-    return std::visit([&ctx](const auto& e) -> std::expected<i64, EvaluateExpressionError> {
+    return std::visit([&ctx](const auto &e) -> std::expected<i64, EvaluateExpressionError>
+        {
         using TT = std::decay_t<decltype(e)>;
         if constexpr (std::is_same_v<TT, BinaryExpression>) {
             if(!e.exp1) return std::unexpected{E::MissingExpression};
@@ -275,21 +315,16 @@ evaluate_expression(const Expression& expr, const RuntimeContext& ctx)
                 return std::unexpected{res2.error()};
             }
             switch(e.op) { // Maybe should have seperate BinaryArithmeic and so on Operators
-                case TokenOperator::Plus:
+                case BinaryArithmeticOperator::Plus:
                     return *res1 + *res2;
-                case TokenOperator::Minus:
+                case BinaryArithmeticOperator::Minus:
                     return *res1 - *res2;
-                case TokenOperator::Star:
+                case BinaryArithmeticOperator::Star:
                     return (*res1) * (*res2);
-                case TokenOperator::Slash:
+                case BinaryArithmeticOperator::Slash:
                     if (*res2 == 0) return std::unexpected{E::DivisionByZero};
                     return *res1 / *res2;
-                case TokenOperator::Equal:
-                case TokenOperator::GreaterThan:
-                case TokenOperator::LessThan:
-                case TokenOperator::GreaterEqualThan:
-                case TokenOperator::LessEqualThan:
-                case TokenOperator::DoubleEqual:
+                default: 
                     return std::unexpected{E::UnsupportedOperator};
             }
         } 
@@ -302,8 +337,7 @@ evaluate_expression(const Expression& expr, const RuntimeContext& ctx)
             auto res = ctx.variable_by_name(e.name);
             if(!res.has_value()) return std::unexpected{E::MissingVariable};
             return *res;
-        }
-    }, expr.node);
+        } }, expr.node);
 }
 
 enum class TokenizeWordError
@@ -384,16 +418,16 @@ tokenize_word(std::string_view word)
     else
     {
         // clang-format off
-        if      (word == "+"   ) return TokenOperator::Plus;
-        else if (word == "-"   ) return TokenOperator::Minus;
-        else if (word == "*"   ) return TokenOperator::Star;
-        else if (word == "/"   ) return TokenOperator::Slash;
+        if      (word == "+"   ) return BinaryArithmeticOperator::Plus;
+        else if (word == "-"   ) return BinaryArithmeticOperator::Minus;
+        else if (word == "*"   ) return BinaryArithmeticOperator::Star;
+        else if (word == "/"   ) return BinaryArithmeticOperator::Slash;
         else if (word == "="   ) return TokenOperator::Equal;
-        else if (word == "=="  ) return TokenOperator::DoubleEqual;
-        else if (word == "<"   ) return TokenOperator::LessThan;
-        else if (word == ">"   ) return TokenOperator::GreaterThan;
-        else if (word == ">="  ) return TokenOperator::GreaterEqualThan;
-        else if (word == "<="  ) return TokenOperator::LessEqualThan;
+        else if (word == "=="  ) return ComparisonOperator::DoubleEqual;
+        else if (word == "<"   ) return ComparisonOperator::LessThan;
+        else if (word == ">"   ) return ComparisonOperator::GreaterThan;
+        else if (word == ">="  ) return ComparisonOperator::GreaterEqualThan;
+        else if (word == "<="  ) return ComparisonOperator::LessEqualThan;
         else if (word == "let" ) return TokenKeyword::Let;
         else if (word == "if"  ) return TokenKeyword::If;
         else if (word == "else") return TokenKeyword::Else;
