@@ -3,11 +3,14 @@
 #include <cassert>
 #include <expected>
 #include <functional>
+#include <memory>
 #include <optional>
 #include <print>
+#include <span>
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -17,7 +20,7 @@ using u64 = uint64_t;
 std::string_view get_code()
 {
     // String literals have static storage duration so this can return a view without issues
-    return "let x = 10;\nif x > 5 then x + 1 else 0;\nlet y = x + 1;";
+    return "let x = 1;\nprint x;\nlet x = 2;\nprint x;\nlet my_var = 123;\nprint my_var;\nlet my_var = x;\nlet y = if x > 5 then x + 1 else 0;\nlet z = x + y + 1;";
 }
 
 bool char_is_whitespace(char c)
@@ -60,7 +63,8 @@ enum class TokenKeyword
     Let,
     If,
     Then,
-    Else
+    Else,
+    Print
 };
 
 using Token = std::variant<BinaryArithmeticOperator, ComparisonOperator, TokenOperator, TokenIdentifier, TokenInteger, TokenKeyword>;
@@ -71,15 +75,16 @@ constexpr bool char_is_digit(char c) noexcept
     return c >= '0' && c <= '9';
 }
 
-constexpr bool char_is_ascii(char c) noexcept
+constexpr bool char_is_valid_for_identifier(char c) noexcept
 {
     return (c >= 'A' && c <= 'Z') ||
-           (c >= 'a' && c <= 'z');
+           (c >= 'a' && c <= 'z') ||
+           c == '_';
 }
 
-bool word_is_ascii(std::string_view s) noexcept
+bool is_valid_identifier(std::string_view s) noexcept
 {
-    return std::ranges::all_of(s, char_is_ascii);
+    return std::ranges::all_of(s, char_is_valid_for_identifier);
 }
 
 enum class StringToIntError
@@ -176,6 +181,8 @@ constexpr std::string_view to_string(TokenKeyword kw) noexcept
         return "Then";
     case TokenKeyword::Else:
         return "Else";
+    case TokenKeyword::Print:
+        return "Print";
     }
     return "UnknownKw";
 }
@@ -227,12 +234,6 @@ static void print_tokens(const std::vector<Token> &toks)
     std::println("]");
 }
 
-struct AssignmentStatement
-{
-    std::string identifier;
-    i64 value;
-};
-
 struct Expression; // forward declaration
 struct ValueExpression
 {
@@ -274,18 +275,38 @@ public:
         if (it == m_variables.end()) return std::nullopt;
         return it->second;
     }
-    void process_assignment_statement(AssignmentStatement expr)
-    {
-        set_variable(expr.identifier, expr.value);
-    }
-
-private:
-    std::unordered_map<std::string, i64> m_variables; // Later this should be a map into value types
     void set_variable(std::string name, i64 value)
     {
         m_variables.insert_or_assign(name, value);
     }
-};
+
+    void print()
+    {
+        std::println("RuntimeContext =");
+        std::println("\t{{");
+
+        bool first = true;
+        for (const auto& [key, value] : m_variables)
+        {
+            if (!first)
+            {
+                std::println(",");
+            }
+            first = false;
+
+            std::print("\t\t\"{}\": {}", key, value);
+        }
+
+        if (!first)
+        {
+            std::println();
+        }
+
+        std::println("\t}};");
+    }
+    private:
+        std::unordered_map<std::string, i64> m_variables;
+    };
 
 enum class EvaluateExpressionError
 {
@@ -458,9 +479,10 @@ tokenize_word(std::string_view word)
         else if (word == "if"  ) return TokenKeyword::If;
         else if (word == "else") return TokenKeyword::Else;
         else if (word == "then") return TokenKeyword::Then;
+        else if (word == "print") return TokenKeyword::Print;
         else
         { // Identifer
-            if (!word_is_ascii(word)) return std::unexpected{E::IdentifierIsNotAscii};
+            if (!is_valid_identifier(word)) return std::unexpected{E::IdentifierIsNotAscii};
             return TokenIdentifier{std::string{word}};
         }
         // clang-format on
@@ -542,11 +564,122 @@ tokenize_next_statement(std::string_view code, size_t &idx)
     return statement;
 }
 
-int main()
+struct AssignmentStatement
 {
-    std::string_view code = get_code();
-    std::println("The code:\n{}\n", code);
+    std::string identifier;
+    Expression expr;
+};
 
+struct PrintStatement
+{
+    Expression expr;
+};
+
+// Statements either don't do anything, have side effects on the context (set a variable)
+// or side effects outside of the context (how function calling is handled idk, but things like printing to console)
+using Statement = std::variant<AssignmentStatement, PrintStatement>;
+
+enum class ParseExpressionError
+{
+    Generic,
+    MalformedExpression,
+    EmptyStatement,
+    NotImplemented
+};
+[[nodiscard]]
+std::expected<Expression, ParseExpressionError>
+parse_expression(std::span<const Token> tokens)
+{
+    using E = ParseExpressionError;
+    if (tokens.empty()) return std::unexpected{E::EmptyStatement};
+    if (tokens.size() > 1) return std::unexpected{E::NotImplemented};
+
+    auto tvar = std::get_if<TokenIdentifier>(&tokens[0]);
+    if(tvar)
+    {
+        return Expression{.node = VariableExpression{.name = tvar->name}};
+    }
+
+    auto tint = std::get_if<TokenInteger>(&tokens[0]);
+    if (tint)
+    {
+        return Expression{.node = ValueExpression{.value = tint->value}};
+    }
+    return std::unexpected{E::MalformedExpression};
+}
+
+enum class ParseStatementError
+{
+    NoKeywordAtStart,
+    MalformedStatement,
+    MalformedExpression,
+    InvalidKeyword,
+    EmptyStatement,
+    InvalidLength,
+    NotImplementedKeyword,
+    NotImplemented,
+    Generic
+};
+[[nodiscard]]
+std::expected<Statement, ParseStatementError>
+parse_statement(const Tokens &tokens)
+{
+    using E = ParseStatementError;
+    if (tokens.empty()) return std::unexpected{E::EmptyStatement};
+    if (auto kw = std::get_if<TokenKeyword>(&tokens[0]))
+    {
+        switch (*kw)
+        {
+        case TokenKeyword::Let:
+        {
+            if (tokens.size() < 4) return std::unexpected{E::InvalidLength};
+            auto var_name = std::get_if<TokenIdentifier>(&tokens[1]);
+            auto equals_op = std::get_if<TokenOperator>(&tokens[2]);
+            if (!var_name || !equals_op || *equals_op != TokenOperator::Equal)
+            {
+                return std::unexpected{E::MalformedStatement};
+            }
+            if (tokens.size() > 4) return std::unexpected{E::NotImplemented};
+            auto res = parse_expression(std::span{tokens}.subspan(3));
+            if (!res)
+            {
+                return std::unexpected{E::MalformedExpression};
+            }
+            return AssignmentStatement{
+                .identifier = var_name->name,
+                .expr = std::move(*res)};
+        }
+        case TokenKeyword::Print:
+        {
+            if (tokens.size() < 2) return std::unexpected{E::InvalidLength};
+            auto res = parse_expression(std::span{tokens}.subspan(1));
+            if (!res)
+            {
+                return std::unexpected{E::MalformedExpression};
+            }
+            return PrintStatement{.expr = std::move(*res)};
+        }
+        case TokenKeyword::If:
+        {
+            return std::unexpected{E::NotImplementedKeyword};
+        }
+        case TokenKeyword::Else:
+        case TokenKeyword::Then:
+        {
+            return std::unexpected{E::InvalidKeyword};
+        }
+        }
+    }
+    else
+    {
+        return std::unexpected{E::NoKeywordAtStart};
+    }
+
+    return std::unexpected{E::Generic};
+}
+
+std::vector<Tokens> tokenize_code(std::string_view code)
+{
     std::vector<Tokens> statement_tokens;
     size_t start_idx = 0;
     while (start_idx < code.length()) // Each iteration is one statement, seperated by ';', whitespace trimmed
@@ -554,16 +687,70 @@ int main()
         auto res = tokenize_next_statement(code, start_idx);
         if (!res)
         {
-            std::println("Failed to parse statement, get parse error code {}",
+            std::println("Skipping Statement as we failed to parse statement, get parse error code {}",
                 static_cast<int>(res.error().tokenize_error));
-            return 1;
         }
-        statement_tokens.push_back(*res);
+        else
+        {
+            statement_tokens.push_back(*res);
+        }
     }
+    return statement_tokens;
+}
+
+enum class ExecuteStatementError
+{
+    Generic,
+    ExpressionError
+};
+[[nodiscard]]
+std::expected<void, ExecuteStatementError>
+execute_statement(RuntimeContext &ctx, const Statement &statement)
+{
+    using E = ExecuteStatementError;
+    return std::visit([&ctx](const auto &s) -> std::expected<void, ExecuteStatementError>
+        {
+        using TT = std::decay_t<decltype(s)>;
+        if constexpr (std::is_same_v<TT, AssignmentStatement>) {
+            auto res = evaluate_expression(s.expr, ctx);
+            if(!res) {
+                return std::unexpected{E::ExpressionError};
+            }
+            ctx.set_variable(s.identifier, *res);
+        }
+        else if constexpr (std::is_same_v<TT, PrintStatement>) {
+            auto res = evaluate_expression(s.expr, ctx);
+            if(!res) {
+                return std::unexpected{E::ExpressionError};
+            }
+            std::println("Interpreter Printout: '{}'", *res);
+        }
+        return {}; }, statement);
+}
+
+int main()
+{
+    std::string_view code = get_code();
+    std::println("The code:\n{}\n", code);
+
+    std::vector<Tokens> statement_tokens = tokenize_code(code);
+
     std::println("Found {} statements:", statement_tokens.size());
     for (size_t i = 0; i < statement_tokens.size(); ++i)
     {
         std::print("Statement[{:2}] = ", i);
         print_tokens(statement_tokens[i]);
+    }
+    std::println();
+
+    RuntimeContext ctx;
+    std::println("Initialised Runtime");
+    ctx.print();
+    for (size_t i = 0; i < 7; ++i) {
+        std::print("Executing the {}. statement: ", i + 1);
+        print_tokens(statement_tokens[i]);
+        if (!execute_statement(ctx, *parse_statement(statement_tokens[i]))) return 1;
+        ctx.print();
+        std::println();
     }
 }
