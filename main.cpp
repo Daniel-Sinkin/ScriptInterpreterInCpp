@@ -1,4 +1,5 @@
 
+#include <algorithm>
 #include <cassert>
 #include <expected>
 #include <functional>
@@ -13,12 +14,13 @@
 using i64 = int64_t;
 using u64 = uint64_t;
 
-std::string get_code()
+std::string_view get_code()
 {
+    // String literals have static storage duration so this can return a view without issues
     return "let x = 10;\nif x > 5 then x + 1 else 0;";
 }
 
-bool is_whitespace(char c)
+bool char_is_whitespace(char c)
 {
     return std::isspace(static_cast<unsigned char>(c));
 }
@@ -62,14 +64,15 @@ constexpr bool char_is_digit(char c) noexcept
     return c >= '0' && c <= '9';
 }
 
-bool word_is_ascii(std::string_view s)
+constexpr bool char_is_ascii(char c) noexcept
 {
-    for (char c : s)
-    {
-        if (c < 'A' || (c > 'Z' && c < 'a') || c > 'z')
-            return false;
-    }
-    return true;
+    return (c >= 'A' && c <= 'Z') ||
+           (c >= 'a' && c <= 'z');
+}
+
+bool word_is_ascii(std::string_view s) noexcept
+{
+    return std::ranges::all_of(s, char_is_ascii);
 }
 
 enum class StringToIntError
@@ -79,7 +82,9 @@ enum class StringToIntError
     Overflow,
     StartsWithZero // Maybe we drop those later and don't increase power later, but strict is good for now
 };
-std::expected<i64, StringToIntError> string_to_i64(const std::string &word) noexcept
+[[nodiscard]]
+std::expected<i64, StringToIntError>
+string_to_i64(std::string_view word) noexcept
 {
     using E = StringToIntError;
     if (word.empty()) return std::unexpected{E::Empty};
@@ -191,15 +196,6 @@ static void print_tokens(const std::vector<Token> &toks)
     std::println("]");
 }
 
-static void print_expressions(const std::vector<std::vector<Token>> &exprs)
-{
-    for (std::size_t i = 0; i < exprs.size(); ++i)
-    {
-        std::print("expr[{}] = ", i);
-        print_tokens(exprs[i]);
-    }
-}
-
 struct AssignmentExpression
 {
     std::string identifier;
@@ -282,7 +278,7 @@ constexpr std::string_view explain(ParseTokenError e) noexcept
 
 [[nodiscard]]
 std::expected<Token, ParseTokenError>
-parse_token(std::string word)
+parse_token(std::string_view word)
 {
     using E = ParseTokenError;
     if (word.empty()) return std::unexpected{E::Empty};
@@ -326,75 +322,114 @@ parse_token(std::string word)
         else
         { // Identifer
             if (!word_is_ascii(word)) return std::unexpected{E::IdentifierIsNotAscii};
-            return TokenIdentifier{word};
+            return TokenIdentifier{std::string{word}};
         }
         // clang-format on
     }
     assert(false && "Fallthrough in parse_token");
 }
 
+struct ParseNextExpressionError
+{
+    ParseTokenError parsing_error;
+    size_t word_idx;
+    size_t word_length;
+};
+[[nodiscard]]
+std::expected<std::vector<Token>, ParseNextExpressionError>
+parse_next_expression(std::string_view code, size_t &idx)
+{
+    std::vector<Token> tokens; // <-- fixed
+
+    while (idx < code.length() && char_is_whitespace(code[idx]))
+    {
+        ++idx;
+    }
+    if (idx >= code.length())
+    {
+        // Empty Expression list is to be understood as "to skip"
+        // Could also treat that as an error case to seperate EOF with ";;"
+        return tokens;
+    }
+
+    while (idx < code.length())
+    {
+        while (idx < code.length() && char_is_whitespace(code[idx]))
+        { // Skips whitespace
+            ++idx;
+        }
+        if (idx >= code.length()) break;
+
+        size_t curr_idx = idx;
+        bool found_semicolon = false;
+
+        while (curr_idx < code.length())
+        { // Consume chars until hitting whitespace or ';'
+            char c = code[curr_idx];
+            if (char_is_whitespace(c))
+            {
+                break;
+            }
+            else if (c == ';')
+            {
+                found_semicolon = true;
+                break;
+            }
+            ++curr_idx;
+        }
+
+        assert(curr_idx > idx);
+        const size_t word_diff = curr_idx - idx;
+        const auto word = code.substr(idx, word_diff);
+
+        auto res = parse_token(word);
+        if (!res)
+        {
+            return std::unexpected(ParseNextExpressionError{
+                .parsing_error = res.error(),
+                .word_idx = idx,
+                .word_length = word_diff});
+        }
+
+        tokens.push_back(res.value());
+
+        idx = curr_idx;
+        if (found_semicolon)
+        {
+            ++idx; // Skips the ';'
+            return tokens;
+        }
+    }
+
+    return tokens;
+}
+
 int main()
 {
     using ExpressionTokens = std::vector<Token>;
 
-    std::string code = get_code();
+    std::string_view code = get_code();
     std::println("The code:\n{}\n", code);
 
     std::vector<ExpressionTokens> expressions;
+    size_t start_idx = 0;
+    while (start_idx < code.length()) // Each iteration is one word, whitespace trimmed
     {
-        std::vector<Token> tokens;
-        size_t start_idx = 0;
-        while (start_idx < code.length()) // Each iteration is one word, whitespace trimmed
+        auto res = parse_next_expression(code, start_idx);
+        if (!res)
         {
-            while (start_idx < code.length() && is_whitespace(code[start_idx]))
-            {
-                ++start_idx;
-            }
-            if (start_idx >= code.length()) break;
-            size_t curr_idx = start_idx;
-
-            [[maybe_unused]] bool found_semicolon = false;
-            while (curr_idx < code.length())
-            {
-                char c = code[curr_idx];
-                if (is_whitespace(c))
-                {
-                    break;
-                }
-                else if (c == ';')
-                {
-                    found_semicolon = true;
-                    break;
-                }
-                ++curr_idx;
-            }
-            assert(curr_idx > start_idx);
-            auto word_diff = curr_idx - start_idx;
-            auto word = code.substr(start_idx, word_diff);
-            auto res = parse_token(word);
-            if (!res)
-            {
-                std::println(
-                    "Failed to parse token '{}', got error TokenParseError::{} ('{}')",
-                    word,
-                    to_string(res.error()),
-                    explain(res.error())
-                    );
-                return 1;
-            }
-            tokens.push_back(res.value());
-
-            if (found_semicolon)
-            {
-                ++curr_idx;
-                expressions.push_back(std::move(tokens));
-                tokens = {};
-            }
-            start_idx = curr_idx;
+            std::println("Failed to parse expression, get parse error code {}",
+                static_cast<int>(res.error().parsing_error));
+            return 1;
         }
+        expressions.push_back(res.value());
     }
     std::println("Finished parsing words!\n");
 
     std::println("Found {} expressions:", expressions.size());
-    print_expressions(expressions);
+    for (size_t i = 0; i < expressions.size(); ++i)
+    {
+        std::print("Expr[{:2}] = ", i);
+        print_tokens(expressions[i]);
+    }
 }
