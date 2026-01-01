@@ -13,254 +13,21 @@
 #include <utility>
 #include <variant>
 #include <vector>
-#include <algorithm>
 
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
 #include <string>
 
+#include "ast.hpp"
+#include "lexer.hpp"
 #include "token.hpp"
 #include "types.hpp"
+#include "util.hpp"
+#include "env.hpp"
 
 namespace ds_lang
 {
-std::string get_code(const std::string& path)
-{
-    std::ifstream in(path);
-    if (!in) {
-        throw std::runtime_error(std::format("Failed to open '{}'", path));
-    }
-
-    std::ostringstream ss;
-    ss << in.rdbuf();
-    return ss.str();
-}
-
-bool char_is_whitespace(char c)
-{
-    return std::isspace(static_cast<unsigned char>(c));
-}
-
-constexpr bool char_is_digit(char c) noexcept
-{
-    return c >= '0' && c <= '9';
-}
-
-constexpr bool char_is_valid_for_identifier(char c) noexcept
-{
-    return (c >= 'A' && c <= 'Z') ||
-           (c >= 'a' && c <= 'z') ||
-           c == '_';
-}
-
-bool is_valid_identifier(std::string_view s) noexcept
-{
-    return std::ranges::all_of(s, char_is_valid_for_identifier);
-}
-
-enum class StringToIntError
-{
-    Empty,
-    InvalidDigit,
-    Overflow,
-    StartsWithZero
-};
-[[nodiscard]]
-std::expected<i64, StringToIntError>
-string_to_i64(std::string_view word) noexcept
-{
-    using E = StringToIntError;
-    if (word.empty()) return std::unexpected{E::Empty};
-    if (word.length() > 1 && word[0] == '0') return std::unexpected{E::StartsWithZero};
-    i64 retval = 0;
-    bool is_negative = false;
-    for (size_t i = 0; i < word.size(); ++i)
-    {
-        char c = word[i];
-        if (i == 0 && c == '-')
-        {
-            is_negative = true;
-            continue;
-        }
-
-        if (!char_is_digit(c))
-        {
-            return std::unexpected{E::InvalidDigit};
-        }
-        retval = retval * 10 + static_cast<i64>(c - '0');
-        if (i > 18) // if this is false then we are guaranteed to fit in i64, avoid having to do bounds check for now
-        {
-            return std::unexpected{E::Overflow};
-        }
-    }
-    return {is_negative ? -retval : retval};
-}
-
-constexpr std::string_view to_string(BinaryOperator op) noexcept
-{
-    switch (op)
-    {
-    case BinaryOperator::Plus:
-        return "Plus";
-    case BinaryOperator::Minus:
-        return "Minus";
-    case BinaryOperator::Star:
-        return "Star";
-    case BinaryOperator::Slash:
-        return "Slash";
-    case BinaryOperator::GreaterThan:
-        return "GreaterThan";
-    case BinaryOperator::LessThan:
-        return "LessThan";
-    case BinaryOperator::GreaterEqualThan:
-        return "GreaterEqualThan";
-    case BinaryOperator::LessEqualThan:
-        return "LessEqualThan";
-    case BinaryOperator::DoubleEqual:
-        return "DoubleEqual";
-    }
-    return "UnknownBinaryOperator";
-}
-
-constexpr std::string_view to_string(TokenOperator op) noexcept
-{
-    switch (op)
-    {
-    case TokenOperator::Equal:
-        return "Equal";
-    }
-    return "UnknownTokenOperator";
-}
-
-constexpr std::string_view to_string(TokenKeyword kw) noexcept
-{
-    switch (kw)
-    {
-    case TokenKeyword::Int:
-        return "Let";
-    case TokenKeyword::If:
-        return "If";
-    case TokenKeyword::Then:
-        return "Then";
-    case TokenKeyword::Else:
-        return "Else";
-    case TokenKeyword::Print:
-        return "Print";
-    }
-    return "UnknownKw";
-}
-
-static std::string token_to_string(const Token &tok)
-{
-    return std::visit([](const auto &t) -> std::string
-        {
-        using TT = std::decay_t<decltype(t)>;
-
-        if constexpr (std::is_same_v<TT, BinaryOperator>)
-        {
-            return std::string{"BinaryOperator("} + std::string{to_string(t)} + ")";
-        }
-        else if constexpr (std::is_same_v<TT, TokenOperator>)
-        {
-            return std::string{"TokenOperator("} + std::string{to_string(t)} + ")";
-        }
-        else if constexpr (std::is_same_v<TT, TokenKeyword>)
-        {
-            return std::string{"Keyword("} + std::string{to_string(t)} + ")";
-        }
-        else if constexpr (std::is_same_v<TT, TokenInteger>)
-        {
-            return std::string{"Integer("} + std::to_string(t.value) + ")";
-        }
-        else if constexpr (std::is_same_v<TT, TokenIdentifier>)
-        {
-            return std::string{"Identifier(\""} + t.name + "\")";
-        }
-        else
-        {
-            return "UnknownToken";
-        } }, tok);
-}
-
-static void print_tokens(const std::vector<Token> &toks)
-{
-    std::print("[");
-    for (std::size_t i = 0; i < toks.size(); ++i)
-    {
-        std::print("{}", token_to_string(toks[i]));
-        if (i + 1 < toks.size()) std::print(", ");
-    }
-    std::println("]");
-}
-
-struct Expression; // forward declaration
-struct ValueExpression
-{
-    i64 value;
-};
-
-struct VariableExpression
-{
-    std::string name;
-};
-
-struct BinaryExpression
-{
-    BinaryOperator op;
-    std::unique_ptr<Expression> exp1;
-    std::unique_ptr<Expression> exp2;
-};
-struct Expression
-{
-    using ExpressionVariant = std::variant<ValueExpression, VariableExpression, BinaryExpression>;
-    ExpressionVariant node;
-};
-
-class RuntimeContext
-{
-public:
-    [[nodiscard]]
-    std::optional<i64>
-    variable_by_name(const std::string &name) const noexcept
-    {
-        auto it = m_variables.find(name);
-        if (it == m_variables.end()) return std::nullopt;
-        return it->second;
-    }
-    void set_variable(std::string name, i64 value)
-    {
-        m_variables.insert_or_assign(name, value);
-    }
-
-    void print()
-    {
-        std::println("RuntimeContext =");
-        std::println("\t{{");
-
-        bool first = true;
-        for (const auto &[key, value] : m_variables)
-        {
-            if (!first)
-            {
-                std::println(",");
-            }
-            first = false;
-
-            std::print("\t\t\"{}\": {}", key, value);
-        }
-
-        if (!first)
-        {
-            std::println();
-        }
-
-        std::println("\t}};");
-    }
-
-private:
-    std::unordered_map<std::string, i64> m_variables;
-};
 
 enum class EvaluateExpressionError
 {
@@ -270,22 +37,21 @@ enum class EvaluateExpressionError
     MissingVariable,
     DivisionByZero
 };
-[[nodiscard]]
-std::expected<i64, EvaluateExpressionError>
-evaluate_expression(const Expression &expr, const RuntimeContext &ctx)
+[[nodiscard]] std::expected<i64, EvaluateExpressionError>
+evaluate_expression(const Expression &expr, const Environment &env)
 {
     using E = EvaluateExpressionError;
-    return std::visit([&ctx](const auto &e) -> std::expected<i64, EvaluateExpressionError>
+    return std::visit([&env](const auto &e) -> std::expected<i64, EvaluateExpressionError>
         {
         using TT = std::decay_t<decltype(e)>;
         if constexpr (std::is_same_v<TT, BinaryExpression>) {
             if(!e.exp1) return std::unexpected{E::MissingExpression};
-            auto res1 = evaluate_expression(*e.exp1, ctx);
+            auto res1 = evaluate_expression(*e.exp1, env);
             if(!res1) {
                 return std::unexpected{res1.error()};
             }
             if(!e.exp2) return std::unexpected{E::MissingExpression};
-            auto res2 = evaluate_expression(*e.exp2, ctx);
+            auto res2 = evaluate_expression(*e.exp2, env);
             if(!res2) {
                 return std::unexpected{res2.error()};
             }
@@ -319,7 +85,7 @@ evaluate_expression(const Expression &expr, const RuntimeContext &ctx)
         }
         else if constexpr (std::is_same_v<TT, VariableExpression>)
         {
-            auto res = ctx.variable_by_name(e.name);
+            auto res = env.get(e.name);
             if(!res.has_value()) return std::unexpected{E::MissingVariable};
             return *res;
         } }, expr.node);
@@ -369,8 +135,7 @@ constexpr std::string_view explain(TokenizeWordError e) noexcept
     return "Unknown token parsing error.";
 }
 
-[[nodiscard]]
-std::expected<Token, TokenizeWordError>
+[[nodiscard]] std::expected<Token, TokenizeWordError>
 tokenize_word(std::string_view word)
 {
     using E = TokenizeWordError;
@@ -430,8 +195,7 @@ struct TokenizeNextStatementError
     size_t word_idx;
     size_t word_length;
 };
-[[nodiscard]]
-std::expected<Tokens, TokenizeNextStatementError>
+[[nodiscard]] std::expected<Tokens, TokenizeNextStatementError>
 tokenize_next_statement(std::string_view code, size_t &idx)
 {
     Tokens statement;
@@ -527,20 +291,24 @@ std::vector<Tokens> tokenize_code(std::string_view code)
             std::println("Lexer failed, the following statement is misformed:");
             size_t print_start = initial_start_idx;
             size_t print_width = 1;
-            while(print_start + print_width < code.size()) {
+            while (print_start + print_width < code.size())
+            {
                 char current_char = code[print_start + print_width];
-                if(current_char == '\n' || current_char == ';') {
+                if (current_char == '\n' || current_char == ';')
+                {
                     break;
                 }
                 ++print_width;
             }
 
             std::println("{}", code.substr(print_start, print_width));
-            for(size_t i = 0; i < err.word_idx - print_start - 1; ++i) {
+            for (size_t i = 0; i < err.word_idx - print_start - 1; ++i)
+            {
                 std::print(" ");
             }
             std::println("^");
-            for(size_t i = 0; i < err.word_idx - print_start - 1; ++i) {
+            for (size_t i = 0; i < err.word_idx - print_start - 1; ++i)
+            {
                 std::print(" ");
             }
             std::println("{} [{}]", explain(err_code), to_string(err_code));
@@ -559,23 +327,22 @@ enum class ExecuteStatementError
     Generic,
     ExpressionError
 };
-[[nodiscard]]
-std::expected<void, ExecuteStatementError>
-execute_statement(RuntimeContext &ctx, const Statement &statement)
+[[nodiscard]] std::expected<void, ExecuteStatementError>
+execute_statement(Environment &env, const Statement &statement)
 {
     using E = ExecuteStatementError;
-    return std::visit([&ctx](const auto &s) -> std::expected<void, ExecuteStatementError>
+    return std::visit([&env](const auto &s) -> std::expected<void, ExecuteStatementError>
         {
         using TT = std::decay_t<decltype(s)>;
         if constexpr (std::is_same_v<TT, AssignmentStatement>) {
-            auto res = evaluate_expression(s.expr, ctx);
+            auto res = evaluate_expression(s.expr, env);
             if(!res) {
                 return std::unexpected{E::ExpressionError};
             }
-            ctx.set_variable(s.identifier, *res);
+            env.set(s.identifier, *res);
         }
         else if constexpr (std::is_same_v<TT, PrintStatement>) {
-            auto res = evaluate_expression(s.expr, ctx);
+            auto res = evaluate_expression(s.expr, env);
             if(!res) {
                 return std::unexpected{E::ExpressionError};
             }
@@ -594,16 +361,16 @@ enum class ParseExpressionError
 struct Parser
 {
 public:
-    std::span<const Token> m_toks;
-    size_t m_pos = 0;
+    std::span<const Token> toks_;
+    size_t pos_ = 0;
 
-    [[nodiscard]] bool end_of_file() const noexcept { return m_pos >= m_toks.size(); }
-    [[nodiscard]] const Token *peek() const noexcept { return end_of_file() ? nullptr : &m_toks[m_pos]; }
+    [[nodiscard]] bool end_of_file() const noexcept { return pos_ >= toks_.size(); }
+    [[nodiscard]] const Token *peek() const noexcept { return end_of_file() ? nullptr : &toks_[pos_]; }
 
     [[nodiscard]] const Token &consume()
     {
         assert(!end_of_file());
-        return m_toks[m_pos++];
+        return toks_[pos_++];
     }
 
     struct BpPair
@@ -700,10 +467,10 @@ public:
 std::expected<Expression, ParseExpressionError>
 parse_expression(std::span<const Token> tokens)
 {
-    Parser p{.m_toks = tokens, .m_pos = 0};
+    Parser p{.toks_ = tokens, .pos_ = 0};
     auto expr = p.parse_expr(0);
     if (!expr) return expr;
-    if (p.m_pos != tokens.size()) return std::unexpected{ParseExpressionError::MalformedExpression};
+    if (p.pos_ != tokens.size()) return std::unexpected{ParseExpressionError::MalformedExpression};
     return expr;
 }
 enum class ParseStatementError
@@ -774,20 +541,38 @@ parse_statement(const Tokens &tokens)
 
     return std::unexpected{E::Generic};
 }
+
+void print_env(const Environment& env) {
+    std::println("Environment =");
+    std::println("\t{{");
+
+    bool first = true;
+    for (const auto& [key, value] : env.variables_) {
+        if (!first) std::println(",");
+        first = false;
+        std::print("\t\t\"{}\": {}", key, value);
+    }
+
+    if (!first) std::println();
+    std::println("\t}};");
+}
 } // namespace ds_lang
 
-int main(int argc, char** argv)
+
+int main(int argc, char **argv)
 {
     using namespace ds_lang;
-    if (argc < 2) {
+    if (argc < 2)
+    {
         std::println("Usage: ds_lang_cli <file.ds>");
         return 1;
     }
-    std::string code = get_code(argv[1]);
+    std::string code = load_code(argv[1]);
     std::println("The code:\n{}\n", code);
 
     std::vector<Tokens> statement_tokens = tokenize_code(code);
-    if(statement_tokens.empty()) {
+    if (statement_tokens.empty())
+    {
         return 0;
     }
 
@@ -799,9 +584,9 @@ int main(int argc, char** argv)
     }
     std::println();
 
-    RuntimeContext ctx;
+    Environment env;
     std::println("Initialised Runtime");
-    ctx.print();
+    print_env(env);
     for (size_t i = 0; i < statement_tokens.size(); ++i)
     {
         std::print("Executing the {}. statement: ", i + 1);
@@ -815,7 +600,7 @@ int main(int argc, char** argv)
                 static_cast<int>(parsed_statement.error()));
             return 1;
         }
-        auto excuted_statement = execute_statement(ctx, *parsed_statement);
+        auto excuted_statement = execute_statement(env, *parsed_statement);
         if (!excuted_statement)
         {
             std::println(
@@ -823,7 +608,7 @@ int main(int argc, char** argv)
                 static_cast<int>(excuted_statement.error()));
             return 1;
         }
-        ctx.print();
+        print_env(env);
         std::println();
     }
 }
