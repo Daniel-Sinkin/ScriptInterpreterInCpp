@@ -87,22 +87,20 @@ int main(int argc, char **argv)
 
         if (line.empty()) continue;
 
-        // Convenience: allow "exit" / "quit"
         if (line == "exit" || line == "quit") break;
 
-        // Your lexer expects ';' to terminate statements; add it if missing.
         if (!line.ends_with(';')) line.push_back(';');
 
         const auto stmts = tokenize_code(line);
         if (stmts.empty()) continue;
 
-        // One line should usually yield exactly one statement.
         for (const auto &toks : stmts)
         {
             auto st = parse_statement(toks);
             if (!st)
             {
-                std::println("Parse error.");
+                auto err = st.error();
+                std::println("Failed to parse statement: {} [{}]", explain(err), to_string(err));
                 continue;
             }
 
