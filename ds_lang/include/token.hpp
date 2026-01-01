@@ -1,3 +1,4 @@
+// ds_lang/include/token.hpp
 #pragma once
 
 #include <string>
@@ -52,15 +53,24 @@ constexpr std::string_view to_string(BinaryOperator op) noexcept
 {
     switch (op)
     {
-    case BinaryOperator::Plus:             return "Plus";
-    case BinaryOperator::Minus:            return "Minus";
-    case BinaryOperator::Star:             return "Star";
-    case BinaryOperator::Slash:            return "Slash";
-    case BinaryOperator::GreaterThan:      return "GreaterThan";
-    case BinaryOperator::LessThan:         return "LessThan";
-    case BinaryOperator::GreaterEqualThan: return "GreaterEqualThan";
-    case BinaryOperator::LessEqualThan:    return "LessEqualThan";
-    case BinaryOperator::DoubleEqual:      return "DoubleEqual";
+    case BinaryOperator::Plus:
+        return "Plus";
+    case BinaryOperator::Minus:
+        return "Minus";
+    case BinaryOperator::Star:
+        return "Star";
+    case BinaryOperator::Slash:
+        return "Slash";
+    case BinaryOperator::GreaterThan:
+        return "GreaterThan";
+    case BinaryOperator::LessThan:
+        return "LessThan";
+    case BinaryOperator::GreaterEqualThan:
+        return "GreaterEqualThan";
+    case BinaryOperator::LessEqualThan:
+        return "LessEqualThan";
+    case BinaryOperator::DoubleEqual:
+        return "DoubleEqual";
     }
     return "UnknownBinaryOperator";
 }
@@ -69,7 +79,8 @@ constexpr std::string_view to_string(TokenOperator op) noexcept
 {
     switch (op)
     {
-    case TokenOperator::Equal: return "Equal";
+    case TokenOperator::Equal:
+        return "Equal";
     }
     return "UnknownTokenOperator";
 }
@@ -78,11 +89,16 @@ constexpr std::string_view to_string(TokenKeyword kw) noexcept
 {
     switch (kw)
     {
-    case TokenKeyword::Int:   return "Int";
-    case TokenKeyword::If:    return "If";
-    case TokenKeyword::Then:  return "Then";
-    case TokenKeyword::Else:  return "Else";
-    case TokenKeyword::Print: return "Print";
+    case TokenKeyword::Int:
+        return "Int";
+    case TokenKeyword::If:
+        return "If";
+    case TokenKeyword::Then:
+        return "Then";
+    case TokenKeyword::Else:
+        return "Else";
+    case TokenKeyword::Print:
+        return "Print";
     }
     return "UnknownTokenKeyword";
 }
