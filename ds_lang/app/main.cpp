@@ -1,4 +1,4 @@
-
+// app/main.cpp
 #include <algorithm>
 #include <cassert>
 #include <expected>
@@ -14,6 +14,7 @@
 #include <variant>
 #include <vector>
 
+namespace ds_lang {
 using i64 = int64_t;
 using u64 = uint64_t;
 
@@ -777,9 +778,11 @@ parse_statement(const Tokens &tokens)
 
     return std::unexpected{E::Generic};
 }
+} // namespace ds_lang
 
 int main()
 {
+    using namespace ds_lang;
     std::string_view code = get_code();
     std::println("The code:\n{}\n", code);
 
