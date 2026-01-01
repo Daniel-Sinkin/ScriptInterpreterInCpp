@@ -47,7 +47,7 @@ struct TokenInteger
 
 enum class TokenKeyword
 {
-    Let,
+    Int,
     If,
     Then,
     Else,

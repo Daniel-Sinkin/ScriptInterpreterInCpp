@@ -13,6 +13,7 @@
 #include <utility>
 #include <variant>
 #include <vector>
+#include <algorithm>
 
 #include <fstream>
 #include <sstream>
@@ -136,7 +137,7 @@ constexpr std::string_view to_string(TokenKeyword kw) noexcept
 {
     switch (kw)
     {
-    case TokenKeyword::Let:
+    case TokenKeyword::Int:
         return "Let";
     case TokenKeyword::If:
         return "If";
@@ -330,7 +331,6 @@ enum class TokenizeWordError
     InvalidIntegerDigit,
     IntegerOverflow,
     StartsWithZero,
-    FallThrough,
     IdentifierIsNotAscii
 };
 constexpr std::string_view to_string(TokenizeWordError e) noexcept
@@ -345,8 +345,6 @@ constexpr std::string_view to_string(TokenizeWordError e) noexcept
         return "IntegerOverflow";
     case TokenizeWordError::StartsWithZero:
         return "StartsWithZero";
-    case TokenizeWordError::FallThrough:
-        return "FallThrough";
     case TokenizeWordError::IdentifierIsNotAscii:
         return "IdentifierIsNotAscii";
     }
@@ -365,8 +363,6 @@ constexpr std::string_view explain(TokenizeWordError e) noexcept
         return "Integer literal is too large to fit into a 64-bit signed integer.";
     case TokenizeWordError::StartsWithZero:
         return "Integer literal has a leading zero, which is not allowed.";
-    case TokenizeWordError::FallThrough:
-        return "Token could not be classified into any known category.";
     case TokenizeWordError::IdentifierIsNotAscii:
         return "Identifier contains non-ASCII alphabetic characters.";
     }
@@ -395,6 +391,7 @@ tokenize_word(std::string_view word)
                 return std::unexpected{E::InvalidIntegerDigit};
             case EE::Empty:
                 assert(false && "'EmptyError' in inner token parse should not happen.");
+                std::unreachable();
             }
         }
         return TokenInteger{*res};
@@ -412,7 +409,7 @@ tokenize_word(std::string_view word)
         else if (word == ">="  ) return BinaryOperator::GreaterEqualThan;
         else if (word == "<="  ) return BinaryOperator::LessEqualThan;
         else if (word == "="   ) return TokenOperator::Equal;
-        else if (word == "let" ) return TokenKeyword::Let;
+        else if (word == "int" ) return TokenKeyword::Int;
         else if (word == "if"  ) return TokenKeyword::If;
         else if (word == "else") return TokenKeyword::Else;
         else if (word == "then") return TokenKeyword::Then;
@@ -424,7 +421,7 @@ tokenize_word(std::string_view word)
         }
         // clang-format on
     }
-    assert(false && "Fallthrough in parse_token");
+    std::unreachable();
 }
 
 struct TokenizeNextStatementError
@@ -521,11 +518,33 @@ std::vector<Tokens> tokenize_code(std::string_view code)
     size_t start_idx = 0;
     while (start_idx < code.length()) // Each iteration is one statement, seperated by ';', whitespace trimmed
     {
+        size_t initial_start_idx = start_idx;
         auto res = tokenize_next_statement(code, start_idx);
         if (!res)
         {
-            std::println("Skipping Statement as we failed to parse statement, get parse error code {}",
-                static_cast<int>(res.error().tokenize_error));
+            TokenizeNextStatementError err = res.error();
+            TokenizeWordError err_code = err.tokenize_error;
+            std::println("Lexer failed, the following statement is misformed:");
+            size_t print_start = initial_start_idx;
+            size_t print_width = 1;
+            while(print_start + print_width < code.size()) {
+                char current_char = code[print_start + print_width];
+                if(current_char == '\n' || current_char == ';') {
+                    break;
+                }
+                ++print_width;
+            }
+
+            std::println("{}", code.substr(print_start, print_width));
+            for(size_t i = 0; i < err.word_idx - print_start - 1; ++i) {
+                std::print(" ");
+            }
+            std::println("^");
+            for(size_t i = 0; i < err.word_idx - print_start - 1; ++i) {
+                std::print(" ");
+            }
+            std::println("{} [{}]", explain(err_code), to_string(err_code));
+            assert(false && "Failed to tokenize statement");
         }
         else
         {
@@ -709,7 +728,7 @@ parse_statement(const Tokens &tokens)
     {
         switch (*kw)
         {
-        case TokenKeyword::Let:
+        case TokenKeyword::Int:
         {
             if (tokens.size() < 4) return std::unexpected{E::InvalidLength};
             auto var_name = std::get_if<TokenIdentifier>(&tokens[1]);
@@ -768,6 +787,9 @@ int main(int argc, char** argv)
     std::println("The code:\n{}\n", code);
 
     std::vector<Tokens> statement_tokens = tokenize_code(code);
+    if(statement_tokens.empty()) {
+        return 0;
+    }
 
     std::println("Found {} statements:", statement_tokens.size());
     for (size_t i = 0; i < statement_tokens.size(); ++i)
@@ -780,7 +802,7 @@ int main(int argc, char** argv)
     RuntimeContext ctx;
     std::println("Initialised Runtime");
     ctx.print();
-    for (size_t i = 0; i < 1; ++i)
+    for (size_t i = 0; i < statement_tokens.size(); ++i)
     {
         std::print("Executing the {}. statement: ", i + 1);
         print_tokens(statement_tokens[i]);
