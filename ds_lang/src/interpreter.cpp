@@ -66,21 +66,20 @@ evaluate_expression(const Expression &expr, const Environment &env)
 [[nodiscard]] std::expected<void, ExecuteStatementError>
 execute_statement(Environment &env, const Statement &statement)
 {
-    using E = ExecuteStatementError;
     return std::visit([&env](const auto &s) -> std::expected<void, ExecuteStatementError>
         {
         using TT = std::decay_t<decltype(s)>;
         if constexpr (std::is_same_v<TT, AssignmentStatement>) {
             auto res = evaluate_expression(s.expr, env);
             if(!res) {
-                return std::unexpected{E::ExpressionError};
+                return std::unexpected{ExecuteStatementError{.expression_error=res.error()}};
             }
             env.set(s.identifier, *res);
         }
         else if constexpr (std::is_same_v<TT, PrintStatement>) {
             auto res = evaluate_expression(s.expr, env);
             if(!res) {
-                return std::unexpected{E::ExpressionError};
+                return std::unexpected{ExecuteStatementError{.expression_error=res.error()}};
             }
             std::println("Interpreter Printout: '{}'", *res);
         }

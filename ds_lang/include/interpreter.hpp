@@ -16,6 +16,42 @@ enum class EvaluateExpressionError
     MissingVariable,
     DivisionByZero
 };
+constexpr std::string_view to_string(EvaluateExpressionError e) noexcept
+{
+    switch (e)
+    {
+    case EvaluateExpressionError::InvalidExpression:
+        return "InvalidExpression";
+    case EvaluateExpressionError::UnsupportedOperator:
+        return "UnsupportedOperator";
+    case EvaluateExpressionError::MissingExpression:
+        return "MissingExpression";
+    case EvaluateExpressionError::MissingVariable:
+        return "MissingVariable";
+    case EvaluateExpressionError::DivisionByZero:
+        return "DivisionByZero";
+    }
+    return "UnknownEvaluateExpressionError";
+}
+
+constexpr std::string_view explain(EvaluateExpressionError e) noexcept
+{
+    switch (e)
+    {
+    case EvaluateExpressionError::InvalidExpression:
+        return "The expression is malformed or internally inconsistent.";
+    case EvaluateExpressionError::UnsupportedOperator:
+        return "The operator used in the expression is not supported.";
+    case EvaluateExpressionError::MissingExpression:
+        return "A required sub-expression is missing.";
+    case EvaluateExpressionError::MissingVariable:
+        return "The expression references a variable that is not defined.";
+    case EvaluateExpressionError::DivisionByZero:
+        return "Division by zero occurred during expression evaluation.";
+    }
+    return "Unknown expression evaluation error.";
+}
+
 [[nodiscard]] std::expected<i64, EvaluateExpressionError>
 evaluate_expression(const Expression &expr, const Environment &env);
 
@@ -34,10 +70,9 @@ struct PrintStatement
 // or side effects outside of the context (how function calling is handled idk, but things like printing to console)
 using Statement = std::variant<AssignmentStatement, PrintStatement>;
 
-enum class ExecuteStatementError
+struct ExecuteStatementError
 {
-    Generic,
-    ExpressionError
+    EvaluateExpressionError expression_error;
 };
 [[nodiscard]] std::expected<void, ExecuteStatementError>
 execute_statement(Environment &env, const Statement &statement);

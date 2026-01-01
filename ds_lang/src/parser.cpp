@@ -7,9 +7,6 @@
 #include <variant>
 
 namespace ds_lang {
-
-namespace {
-
 struct Parser
 {
     std::span<const Token> toks;
@@ -97,8 +94,6 @@ struct Parser
         return lhs;
     }
 };
-
-} // namespace
 
 std::expected<Expression, ParseExpressionError>
 parse_expression(std::span<const Token> tokens)
