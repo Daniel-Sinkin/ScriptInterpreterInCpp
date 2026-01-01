@@ -14,59 +14,32 @@
 #include <variant>
 #include <vector>
 
-namespace ds_lang {
-using i64 = int64_t;
-using u64 = uint64_t;
+#include <fstream>
+#include <sstream>
+#include <stdexcept>
+#include <string>
 
-std::string_view get_code()
+#include "token.hpp"
+#include "types.hpp"
+
+namespace ds_lang
 {
-    // String literals have static storage duration so this can return a view without issues
-    return "let x = 1 + 1 * 3;\nprint x;\nlet x = 2;\nprint x;\nlet my_var = 123;\nprint my_var;\nlet my_var = x;\nlet y = if x > 5 then x + 1 else 0;\nlet z = x + y + 1;";
+std::string get_code(const std::string& path)
+{
+    std::ifstream in(path);
+    if (!in) {
+        throw std::runtime_error(std::format("Failed to open '{}'", path));
+    }
+
+    std::ostringstream ss;
+    ss << in.rdbuf();
+    return ss.str();
 }
 
 bool char_is_whitespace(char c)
 {
     return std::isspace(static_cast<unsigned char>(c));
 }
-
-enum class BinaryOperator
-{
-    Plus,  // +
-    Minus, // -
-    Star,  // *
-    Slash, // /
-    GreaterThan,      // >
-    LessThan,         // <
-    GreaterEqualThan, // >=
-    LessEqualThan,    // <=
-    DoubleEqual,      // ==
-};
-enum class TokenOperator
-{
-    Equal, // =
-};
-
-struct TokenIdentifier
-{
-    std::string name;
-};
-
-struct TokenInteger
-{
-    int64_t value;
-};
-
-enum class TokenKeyword
-{
-    Let,
-    If,
-    Then,
-    Else,
-    Print
-};
-
-using Token = std::variant<BinaryOperator, TokenOperator, TokenIdentifier, TokenInteger, TokenKeyword>;
-using Tokens = std::vector<Token>;
 
 constexpr bool char_is_digit(char c) noexcept
 {
@@ -265,7 +238,7 @@ public:
         std::println("\t{{");
 
         bool first = true;
-        for (const auto& [key, value] : m_variables)
+        for (const auto &[key, value] : m_variables)
         {
             if (!first)
             {
@@ -283,9 +256,10 @@ public:
 
         std::println("\t}};");
     }
-    private:
-        std::unordered_map<std::string, i64> m_variables;
-    };
+
+private:
+    std::unordered_map<std::string, i64> m_variables;
+};
 
 enum class EvaluateExpressionError
 {
@@ -541,8 +515,6 @@ struct PrintStatement
 // or side effects outside of the context (how function calling is handled idk, but things like printing to console)
 using Statement = std::variant<AssignmentStatement, PrintStatement>;
 
-
-
 std::vector<Tokens> tokenize_code(std::string_view code)
 {
     std::vector<Tokens> statement_tokens;
@@ -600,25 +572,29 @@ enum class ParseExpressionError
     EmptyStatement,
     NotImplemented
 };
-struct Parser {
+struct Parser
+{
 public:
     std::span<const Token> m_toks;
     size_t m_pos = 0;
 
     [[nodiscard]] bool end_of_file() const noexcept { return m_pos >= m_toks.size(); }
-    [[nodiscard]] const Token* peek() const noexcept { return end_of_file() ? nullptr : &m_toks[m_pos]; }
+    [[nodiscard]] const Token *peek() const noexcept { return end_of_file() ? nullptr : &m_toks[m_pos]; }
 
-    [[nodiscard]] const Token& consume()
+    [[nodiscard]] const Token &consume()
     {
         assert(!end_of_file());
         return m_toks[m_pos++];
     }
 
-    struct BpPair { int left; int right; };
+    struct BpPair
+    {
+        int left;
+        int right;
+    };
 
-    [[nodiscard]] static
-    std::optional<BpPair>
-    infix_bp(const Token& tok) noexcept
+    [[nodiscard]] static std::optional<BpPair>
+    infix_bp(const Token &tok) noexcept
     {
         // Return nullopt if tok is not an infix operator in expressions.
         if (auto bop = std::get_if<BinaryOperator>(&tok))
@@ -655,13 +631,14 @@ public:
     {
         using E = ParseExpressionError;
 
-        if(end_of_file()) return std::unexpected{E::MalformedExpression};;
+        if (end_of_file()) return std::unexpected{E::MalformedExpression};
+        ;
 
         Expression lhs;
         {
-            const Token& t = consume();
+            const Token &t = consume();
 
-            if(auto tid = std::get_if<TokenInteger>(&t))
+            if (auto tid = std::get_if<TokenInteger>(&t))
             {
                 lhs.node = ValueExpression{.value = tid->value};
             }
@@ -675,18 +652,18 @@ public:
             }
         }
 
-        while(true)
+        while (true)
         {
-            const Token* next = peek();
-            if(!next) break;
+            const Token *next = peek();
+            if (!next) break;
 
             auto bp = infix_bp(*next);
-            if(!bp || bp->left < min_bp) break;
+            if (!bp || bp->left < min_bp) break;
 
             BinaryOperator op = std::get<BinaryOperator>(consume());
 
             auto rhs = parse_expr(bp->right);
-            if(!rhs) return std::unexpected{rhs.error()};
+            if (!rhs) return std::unexpected{rhs.error()};
 
             BinaryExpression b{
                 .op = op,
@@ -780,10 +757,14 @@ parse_statement(const Tokens &tokens)
 }
 } // namespace ds_lang
 
-int main()
+int main(int argc, char** argv)
 {
     using namespace ds_lang;
-    std::string_view code = get_code();
+    if (argc < 2) {
+        std::println("Usage: ds_lang_cli <file.ds>");
+        return 1;
+    }
+    std::string code = get_code(argv[1]);
     std::println("The code:\n{}\n", code);
 
     std::vector<Tokens> statement_tokens = tokenize_code(code);
@@ -799,24 +780,25 @@ int main()
     RuntimeContext ctx;
     std::println("Initialised Runtime");
     ctx.print();
-    for (size_t i = 0; i < 1; ++i) {
+    for (size_t i = 0; i < 1; ++i)
+    {
         std::print("Executing the {}. statement: ", i + 1);
         print_tokens(statement_tokens[i]);
 
         auto parsed_statement = parse_statement(statement_tokens[i]);
-        if(!parsed_statement) {
+        if (!parsed_statement)
+        {
             std::println(
                 "Failed to parse statement with error code {}",
-                static_cast<int>(parsed_statement.error())
-            );
+                static_cast<int>(parsed_statement.error()));
             return 1;
         }
         auto excuted_statement = execute_statement(ctx, *parsed_statement);
-        if (!excuted_statement) {
+        if (!excuted_statement)
+        {
             std::println(
                 "Failed to execute statement with error code {}",
-                static_cast<int>(excuted_statement.error())
-            );
+                static_cast<int>(excuted_statement.error()));
             return 1;
         }
         ctx.print();
