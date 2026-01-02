@@ -8,16 +8,10 @@
 #include "token.hpp"
 #include "util.hpp"
 
-namespace ds_lang {
-
-} // namespace ds_lang
-
 int main() {
     using namespace ds_lang;
 
-    load_code("examples/new.ds2");
-
-    std::string code = "LET x = 1\nPRINT x";
+    std::string code = load_code("examples/simple.ds");
 
     std::vector<Token> tokens = Lexer{code}.take_tokens();
     for(const Token& token : tokens) {

@@ -1,4 +1,2 @@
-int x = 123;
-int y = -67;
-int z = x + y;
-print z;
+LET x = 5
+PRINT x
