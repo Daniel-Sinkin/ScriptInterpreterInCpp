@@ -1,6 +1,6 @@
-// include/lexer.hpp
 #pragma once
 
+#include <cassert>
 #include <string_view>
 #include <vector>
 
@@ -8,45 +8,21 @@
 #include "types.hpp"
 
 namespace ds_lang {
+
 class Lexer {
   public:
-    explicit Lexer(std::string_view code) noexcept // TODO: Need to think of a good way to handle code lifetime
-        : code_(code), pos_(0), line_(0), column_(0) {}
+    explicit Lexer(std::string_view code) noexcept : code_(code) {}
     Lexer() = delete;
-    Lexer(const Lexer &) = default;
-    Lexer &operator=(const Lexer &) = default;
 
-    bool eof() const { 
-        assert(is_active_);
-        return pos_ >= code_.size();
-    }
-
-    TokenKind determine_token_kind(std::string_view lexeme) const;
-
-    [[nodiscard]] std::vector<Token> take_tokens() &&;
+    [[nodiscard]] std::vector<Token> tokenize_all() const;
+    [[nodiscard]] std::vector<Token> tokenize_range(usize left, usize right) const; // [left,right)
 
   private:
     std::string_view code_;
-    usize pos_ = 0zu;
-    int line_ = 0;
-    int column_ = 0;
-    std::vector<Token> tokens_;
-    bool is_active_ = true;
 
-    Token process_next_token();
+    TokenKind determine_token_kind(std::string_view lexeme, int line, int column) const;
 
-    void new_char() {
-        assert(is_active_);
-        ++pos_;
-        ++column_;
-    }
-
-    void new_line() {
-        assert(is_active_);
-        ++pos_;
-        column_ = 0;
-        ++line_;
-    }
-
+    static void compute_line_col_at(std::string_view code, usize pos, int &line, int &col);
 };
+
 } // namespace ds_lang

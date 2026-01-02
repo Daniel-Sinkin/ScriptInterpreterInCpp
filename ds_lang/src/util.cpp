@@ -1,21 +1,16 @@
 // ds_lang/src/util.cpp
-#include <algorithm>
 #include <format>
 #include <fstream>
-#include <ranges>
 #include <sstream>
 #include <stdexcept>
 #include <string>
 
 #include "util.hpp"
 
-namespace ds_lang
-{
-std::string load_code(const std::string &path)
-{
+namespace ds_lang {
+std::string load_code(const std::string &path) {
     std::ifstream in(path);
-    if (!in)
-    {
+    if (!in) {
         throw std::runtime_error(std::format("Failed to open '{}'", path));
     }
 
@@ -24,38 +19,73 @@ std::string load_code(const std::string &path)
     return ss.str();
 }
 
-bool is_valid_identifier(std::string_view s) noexcept
-{
-    return std::ranges::all_of(s, char_is_valid_for_identifier);
+bool is_valid_identifier(std::string_view s) noexcept {
+    if (s.empty())
+        return false;
+    if (!char_is_valid_for_identifier(s[0]))
+        return false;
+
+    for (usize i = 1; i < s.size(); ++i) {
+        const char c = s[i];
+        if (!(char_is_valid_for_identifier(c) || char_is_digit(c)))
+            return false;
+    }
+    return true;
 }
 
 [[nodiscard]] std::expected<i64, StringToIntError>
-string_to_i64(std::string_view word) noexcept
-{
+string_to_i64(std::string_view word) noexcept {
     using E = StringToIntError;
-    if (word.empty()) return std::unexpected{E::Empty};
-    if (word.length() > 1 && word[0] == '0') return std::unexpected{E::StartsWithZero};
-    i64 retval = 0;
-    bool is_negative = false;
-    for (size_t i = 0; i < word.size(); ++i)
-    {
-        char c = word[i];
-        if (i == 0 && c == '-')
-        {
-            is_negative = true;
-            continue;
-        }
 
-        if (!char_is_digit(c))
-        {
-            return std::unexpected{E::InvalidDigit};
-        }
-        retval = retval * 10 + static_cast<i64>(c - '0');
-        if (i > 18) // if this is false then we are guaranteed to fit in i64, avoid having to do bounds check for now
-        {
-            return std::unexpected{E::Overflow};
-        }
+    if (word.empty())
+        return std::unexpected{E::Empty};
+
+    int sign = 1;
+    usize i = 0;
+
+    if (word[0] == '-') {
+        sign = -1;
+        i = 1;
+    } else if (word[0] == '+') {
+        // tests expect "+1" to be invalid
+        return std::unexpected{E::InvalidDigit};
     }
-    return {is_negative ? -retval : retval};
+
+    if (i >= word.size()) {
+        // just "-" (no digits)
+        return std::unexpected{E::InvalidDigit};
+    }
+
+    if (word[i] == '0' && (i + 1) < word.size()) {
+        return std::unexpected{E::StartsWithZero};
+    }
+
+    const u64 pos_limit = static_cast<u64>(std::numeric_limits<i64>::max());
+    const u64 neg_limit = pos_limit + 1ULL; // 9223372036854775808
+    const u64 limit = (sign < 0) ? neg_limit : pos_limit;
+
+    u64 acc = 0;
+    while(i < word.size()) {
+        const char c = word[i];
+        if (!char_is_digit(c))
+            return std::unexpected{E::InvalidDigit};
+
+        const u64 d = static_cast<u64>(c - '0');
+
+        // overflow check: acc*10 + d <= limit
+        if (acc > (limit - d) / 10ULL)
+            return std::unexpected{E::Overflow};
+
+        acc = acc * 10ULL + d;
+        ++i;
+    }
+
+    if (sign > 0) {
+        return static_cast<i64>(acc);
+    }
+    if (acc == neg_limit) {
+        return std::numeric_limits<i64>::min();
+    }
+    return -static_cast<i64>(acc);
 }
 } // namespace ds_lang
