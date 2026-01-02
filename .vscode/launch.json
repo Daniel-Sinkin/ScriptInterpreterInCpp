@@ -8,7 +8,8 @@
             "program": "${workspaceFolder}/build/ds_lang_cli",
             "args": ["examples/simple.ds"],
             "cwd": "${workspaceFolder}",
-            "stopOnEntry": false
+            "stopOnEntry": false,
+            "preLaunchTask": "cmake: configure+build"
         }
     ]
 }

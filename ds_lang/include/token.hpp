@@ -1,109 +1,81 @@
 // ds_lang/include/token.hpp
 #pragma once
-
-#include <string>
 #include <string_view>
-#include <variant>
-#include <vector>
-
-#include "types.hpp"
+#include <format>
 
 namespace ds_lang
 {
-
-enum class BinaryOperator
-{
-    Plus,
-    Minus,
-    Star,
-    Slash,
-    GreaterThan,
-    LessThan,
-    GreaterEqualThan,
-    LessEqualThan,
-    DoubleEqual
+enum class TokenKind {
+    Identifier,
+    Integer,
+    KWLet,
+    KWPrint,
+    OpEqual,
+    Newline,
+    Eof
 };
-enum class TokenOperator
-{
-    Equal
+struct Token {
+    TokenKind kind;
+    std::string_view lexeme;
+    int line;
+    int column;
 };
-
-struct TokenIdentifier
-{
-    std::string name;
-};
-struct TokenInteger
-{
-    i64 value;
-};
-
-enum class TokenKeyword
-{
-    Int,
-    If,
-    Then,
-    Else,
-    Print
-};
-
-using Token = std::variant<BinaryOperator, TokenOperator, TokenIdentifier, TokenInteger, TokenKeyword>;
-using Tokens = std::vector<Token>;
-
-constexpr std::string_view to_string(BinaryOperator op) noexcept
-{
-    switch (op)
-    {
-    case BinaryOperator::Plus:
-        return "Plus";
-    case BinaryOperator::Minus:
-        return "Minus";
-    case BinaryOperator::Star:
-        return "Star";
-    case BinaryOperator::Slash:
-        return "Slash";
-    case BinaryOperator::GreaterThan:
-        return "GreaterThan";
-    case BinaryOperator::LessThan:
-        return "LessThan";
-    case BinaryOperator::GreaterEqualThan:
-        return "GreaterEqualThan";
-    case BinaryOperator::LessEqualThan:
-        return "LessEqualThan";
-    case BinaryOperator::DoubleEqual:
-        return "DoubleEqual";
+constexpr std::string_view to_string(TokenKind k) noexcept {
+    switch (k) {
+    case TokenKind::Identifier:
+        return "Identifier";
+    case TokenKind::Integer:
+        return "Integer";
+    case TokenKind::KWLet:
+        return "KWLet";
+    case TokenKind::KWPrint:
+        return "KWPrint";
+    case TokenKind::OpEqual:
+        return "OpEqual";
+    case TokenKind::Newline:
+        return "Newline";
+    case TokenKind::Eof:
+        return "Eof";
     }
-    return "UnknownBinaryOperator";
+    return "UnknownTokenKind";
 }
 
-constexpr std::string_view to_string(TokenOperator op) noexcept
-{
-    switch (op)
-    {
-    case TokenOperator::Equal:
-        return "Equal";
+constexpr std::string_view explain(TokenKind k) noexcept {
+    switch (k) {
+    case TokenKind::Identifier:
+        return "A user-defined name (variable or function identifier).";
+    case TokenKind::Integer:
+        return "A base-10 integer literal.";
+    case TokenKind::KWLet:
+        return "Keyword introducing a variable definition or assignment.";
+    case TokenKind::KWPrint:
+        return "Keyword for printing a value to standard output.";
+    case TokenKind::OpEqual:
+        return "Assignment operator “=”.";
+    case TokenKind::Newline:
+        return "Newline token that terminates a statement.";
+    case TokenKind::Eof:
+        return "End-of-file marker indicating no more input.";
     }
-    return "UnknownTokenOperator";
+    return "Unknown token kind.";
 }
-
-constexpr std::string_view to_string(TokenKeyword kw) noexcept
-{
-    switch (kw)
-    {
-    case TokenKeyword::Int:
-        return "Int";
-    case TokenKeyword::If:
-        return "If";
-    case TokenKeyword::Then:
-        return "Then";
-    case TokenKeyword::Else:
-        return "Else";
-    case TokenKeyword::Print:
-        return "Print";
-    }
-    return "UnknownTokenKeyword";
-}
-
-std::string token_to_string(const Token &tok);
-void print_tokens(const std::vector<Token> &toks);
 
 } // namespace ds_lang
+
+template <>
+struct std::formatter<ds_lang::TokenKind> : std::formatter<std::string_view> {
+    auto format(ds_lang::TokenKind k, format_context &ctx) const {
+        return std::formatter<std::string_view>::format(ds_lang::to_string(k),
+                                                        ctx);
+    }
+};
+
+template <>
+struct std::formatter<ds_lang::Token> : std::formatter<std::string_view> {
+    auto format(const ds_lang::Token &t, format_context &ctx) const {
+        // Example: Token{kind=KWLet, lexeme="LET", line=0, column=0}
+        return std::format_to(
+            ctx.out(), "Token{{kind={}, lexeme={:?}, line={}, column={}}}",
+            t.kind, t.lexeme, t.line, t.column);
+    }
+};

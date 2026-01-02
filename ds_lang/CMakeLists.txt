@@ -1,6 +1,8 @@
 # ds_lang/CMakeLists.txt
 cmake_minimum_required(VERSION 3.23)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 project(ds_lang VERSION 0.1.0 LANGUAGES CXX)
 
 option(DS_LANG_WARNINGS_AS_ERRORS "Treat warnings as errors" ON)
@@ -30,8 +32,7 @@ else()
     endif()
 endif()
 
+
 add_executable(ds_lang_cli app/main.cpp)
 target_link_libraries(ds_lang_cli PRIVATE ds_lang)
 target_compile_features(ds_lang_cli PRIVATE cxx_std_23)
-
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)

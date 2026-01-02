@@ -1,176 +1,91 @@
-// include/lexer.hpp
-#include <expected>
+// src/lexer.cpp
+#include <format>
+#include <stdexcept>
 #include <string_view>
-#include <print>
 
 #include "lexer.hpp"
 #include "token.hpp"
+#include "types.hpp"
 #include "util.hpp"
 
-namespace ds_lang
-{
-[[nodiscard]] std::expected<Token, TokenizeWordError>
-tokenize_word(std::string_view word)
-{
-    using E = TokenizeWordError;
-    if (word.empty()) return std::unexpected{E::Empty};
-    if ((word[0] == '-' && word.length() > 1) || (char_is_digit(word[0])))
-    {
-        auto res = string_to_i64(word);
-        if (!res)
-        {
-            using EE = StringToIntError;
-            switch (res.error())
-            {
-            case EE::Overflow:
-                return std::unexpected{E::IntegerOverflow};
-            case EE::StartsWithZero:
-                return std::unexpected{E::StartsWithZero};
-            case EE::InvalidDigit:
-                return std::unexpected{E::InvalidIntegerDigit};
-            case EE::Empty:
-                std::unreachable();
-            }
-        }
-        return TokenInteger{*res};
+namespace ds_lang {
+TokenKind Lexer::determine_token_kind(std::string_view lexeme) const {
+    if (lexeme.empty()) {
+        throw std::runtime_error("Kind build token out of empty lexeme");
     }
-    else
-    {
-        // clang-format off
-        if      (word == "+"   ) return BinaryOperator::Plus;
-        else if (word == "-"   ) return BinaryOperator::Minus;
-        else if (word == "*"   ) return BinaryOperator::Star;
-        else if (word == "/"   ) return BinaryOperator::Slash;
-        else if (word == "=="  ) return BinaryOperator::DoubleEqual;
-        else if (word == "<"   ) return BinaryOperator::LessThan;
-        else if (word == ">"   ) return BinaryOperator::GreaterThan;
-        else if (word == ">="  ) return BinaryOperator::GreaterEqualThan;
-        else if (word == "<="  ) return BinaryOperator::LessEqualThan;
-        else if (word == "="   ) return TokenOperator::Equal;
-        else if (word == "int" ) return TokenKeyword::Int;
-        else if (word == "if"  ) return TokenKeyword::If;
-        else if (word == "else") return TokenKeyword::Else;
-        else if (word == "then") return TokenKeyword::Then;
-        else if (word == "print") return TokenKeyword::Print;
-        else
-        { // Identifer
-            if (!is_valid_identifier(word)) return std::unexpected{E::IdentifierIsNotAscii};
-            return TokenIdentifier{std::string{word}};
+    if (lexeme == "LET") {
+        return TokenKind::KWLet;
+    } else if (lexeme == "PRINT") {
+        return TokenKind::KWPrint;
+    } else if (lexeme == "=") {
+        return TokenKind::OpEqual;
+    } else if (lexeme == "\n") {
+        return TokenKind::Newline;
+    } else if (char_is_digit(lexeme[0])) {
+        auto res = string_to_i64(lexeme);
+        if (!res) {
+            StringToIntError err = res.error();
+            throw std::runtime_error(
+                std::format("Failed to convert lexeme {} into an integer: {} [{}]",
+                            lexeme, explain(err), to_string(err)));
         }
-        // clang-format on
+        return TokenKind::Integer;
+    } else {
+        if (!is_valid_identifier(lexeme)) {
+            throw std::runtime_error(
+                std::format("The lexeme {} is not a valid identifier! (line={},column={})",
+                            lexeme, line_, column_));
+        }
+        return TokenKind::Identifier;
     }
-    std::unreachable();
 }
 
-[[nodiscard]] std::expected<Tokens, TokenizeNextStatementError>
-tokenize_next_statement(std::string_view code, size_t &idx)
-{
-    Tokens statement;
-    while (idx < code.length() && is_whitespace(code[idx]))
-    {
-        ++idx;
-    }
-    if (idx >= code.length())
-    {
-        // Empty Statement list is to be understood as "to skip"
-        // Could also treat that as an error case to seperate EOF with ";;"
-        return statement;
-    }
+[[nodiscard]]
+std::vector<Token> Lexer::take_tokens() && {
+    assert(is_active_);
 
-    while (idx < code.length())
-    {
-        while (idx < code.length() && is_whitespace(code[idx]))
-        { // Skips whitespace
-            ++idx;
-        }
-        if (idx >= code.length()) break;
-
-        size_t curr_idx = idx;
-        bool found_semicolon = false;
-
-        while (curr_idx < code.length())
-        { // Consume chars until hitting whitespace or ';'
-            char c = code[curr_idx];
-            if (is_whitespace(c))
-            {
-                break;
-            }
-            else if (c == ';')
-            {
-                found_semicolon = true;
-                break;
-            }
-            ++curr_idx;
-        }
-        assert(curr_idx > idx);
-        const size_t word_diff = curr_idx - idx;
-        const auto word = code.substr(idx, word_diff);
-
-        auto res = tokenize_word(word);
-        if (!res)
-        {
-            return std::unexpected(TokenizeNextStatementError{
-                .tokenize_error = res.error(),
-                .word_idx = idx,
-                .word_length = word_diff});
-        }
-        statement.push_back(*res);
-
-        idx = curr_idx;
-        if (found_semicolon)
-        {
-            ++idx; // Skips the ';'
-            return statement;
+    while (true) {
+        Token t = process_next_token();
+        tokens_.push_back(t);
+        if (t.kind == TokenKind::Eof) {
+            break;
         }
     }
-
-    return statement;
+    assert(eof() && !tokens_.empty() && tokens_.back().kind == TokenKind::Eof);
+    is_active_ = false;
+    return std::move(tokens_);
 }
 
-std::vector<Tokens> tokenize_code(std::string_view code)
-{
-    std::vector<Tokens> statement_tokens;
-    size_t start_idx = 0;
-    while (start_idx < code.length()) // Each iteration is one statement, seperated by ';', whitespace trimmed
-    {
-        size_t initial_start_idx = start_idx;
-        auto res = tokenize_next_statement(code, start_idx);
-        if (!res)
-        {
-            TokenizeNextStatementError err = res.error();
-            TokenizeWordError err_code = err.tokenize_error;
-            std::println("Lexer failed, the following statement is misformed:");
-            size_t print_start = initial_start_idx;
-            size_t print_width = 1;
-            while (print_start + print_width < code.size())
-            {
-                char current_char = code[print_start + print_width];
-                if (current_char == '\n' || current_char == ';')
-                {
-                    break;
-                }
-                ++print_width;
-            }
+Token Lexer::process_next_token() {
+    /// <Contracts
+    assert(is_active_);
 
-            std::println("{}", code.substr(print_start, print_width));
-            for (size_t i = 0; i < err.word_idx - print_start - 1; ++i)
-            {
-                std::print(" ");
-            }
-            std::println("^");
-            for (size_t i = 0; i < err.word_idx - print_start - 1; ++i)
-            {
-                std::print(" ");
-            }
-            std::println("{} [{}]", explain(err_code), to_string(err_code));
-            assert(false && "Failed to tokenize statement");
-        }
-        else
-        {
-            statement_tokens.push_back(*res);
-        }
+    const usize old_pos = pos_;
+    ScopeExit ensure{[&] {
+        assert(pos_ > old_pos || eof());
+    }};
+    /// Contracts>
+
+    while (!eof() && is_hspace(code_[pos_])) {
+        new_char();
     }
-    return statement_tokens;
+    if (eof())
+        return Token{TokenKind::Eof, std::string_view{}, line_, column_};
+    if (is_newline(code_[pos_])) {
+        Token token{TokenKind::Newline, code_.substr(pos_, 1), line_,
+                    column_};
+        new_line();
+        return token;
+    }
+    const usize word_start = pos_;
+    const int tok_line = line_;
+    const int tok_col = column_;
+    while (!eof() && !is_hspace(code_[pos_]) && !is_newline(code_[pos_])) {
+        new_char();
+    }
+    assert(pos_ > word_start);
+    std::string_view lexeme = code_.substr(word_start, pos_ - word_start);
+    return {determine_token_kind(lexeme), lexeme, tok_line, tok_col};
 }
 
 } // namespace ds_lang
