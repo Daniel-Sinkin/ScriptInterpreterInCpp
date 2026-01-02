@@ -1,0 +1,95 @@
+FUNC gcd(a, b)
+    WHILE b != 0 DO
+        LET t = a % b
+        LET a = b
+        LET b = t
+    END
+    RETURN a
+END
+
+FUNC is_prime(n)
+    IF n < 2 THEN
+        RETURN 0
+    END
+
+    IF n % 2 == 0 THEN
+        RETURN n == 2
+    END
+
+    LET d = 3
+    WHILE d * d <= n DO
+        IF n % d == 0 THEN
+            RETURN 0
+        END
+        LET d = d + 2
+    END
+    RETURN 1
+END
+
+FUNC lcg_next(state)
+    # Deterministic PRNG: state = (a*state + c) mod 2^31
+    LET a = 1103515245
+    LET c = 12345
+    LET m = 2147483648
+    LET state = (a * state + c) % m
+    RETURN state
+END
+
+FUNC main()
+    LET seed = 42
+    LET i = 0
+
+    LET best_g = 0
+    LET best_a = 0
+    LET best_b = 0
+
+    # Generate pairs, compute gcds, and track the best gcd among prime pairs.
+    WHILE i < 200 DO
+        LET seed = lcg_next(seed)
+        LET a = (seed % 5000) + 1
+
+        LET seed = lcg_next(seed)
+        LET b = (seed % 5000) + 1
+
+        IF is_prime(a) && is_prime(b) THEN
+            LET g = gcd(a, b)
+            IF g > best_g THEN
+                LET best_g = g
+                LET best_a = a
+                LET best_b = b
+            END
+        END
+
+        LET i = i + 1
+    END
+
+    PRINT "best prime-pair gcd:"
+    PRINT best_g
+    PRINT "a="
+    PRINT best_a
+    PRINT "b="
+    PRINT best_b
+
+    # Print a small table: for each x=1..30, count y=1..30 such that gcd(x,y)=x (i.e. y is a multiple of x)
+    LET x = 1
+    WHILE x <= 30 DO
+        LET y = 1
+        LET count = 0
+        WHILE y <= 30 DO
+            IF gcd(x, y) == x THEN
+                LET count = count + 1
+            END
+            LET y = y + 1
+        END
+
+        PRINT "multiples count for x="
+        PRINT x
+        PRINT count
+
+        LET x = x + 1
+    END
+
+    RETURN 0
+END
+
+main()

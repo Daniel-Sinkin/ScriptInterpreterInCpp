@@ -2,34 +2,39 @@
 #pragma once
 
 #include <expected>
-#include <string_view>
 #include <functional>
+#include <string_view>
 
 #include "types.hpp"
 
-namespace ds_lang
-{
+namespace ds_lang {
+// std::variant and std::visit magic helper to abe able to use multiple visitor lambdas
+template <class... Ts>
+struct overloaded : Ts... {
+    using Ts::operator()...;
+};
+template <class... Ts>
+overloaded(Ts...) -> overloaded<Ts...>;
+
 struct ScopeExit {
     std::function<void()> f;
     ~ScopeExit() { f(); }
 };
 
-std::string load_code(const std::string& path);
+std::string load_code(const std::string &path);
 
 constexpr bool is_hspace(char c) noexcept // hspace == horizontal whitespace
 {
     return c == ' ' || c == '\t' || c == '\r' ||
            c == '\f' || c == '\v';
 }
-constexpr bool is_newline(char c) noexcept
-{
+constexpr bool is_newline(char c) noexcept {
     return c == '\n';
 }
 
 constexpr bool char_is_digit(char c) noexcept { return c >= '0' && c <= '9'; }
 
-constexpr bool char_is_valid_for_identifier(char c) noexcept
-{
+constexpr bool char_is_valid_for_identifier(char c) noexcept {
     return (c >= 'A' && c <= 'Z') ||
            (c >= 'a' && c <= 'z') ||
            c == '_';
@@ -37,17 +42,14 @@ constexpr bool char_is_valid_for_identifier(char c) noexcept
 
 bool is_valid_identifier(std::string_view s) noexcept;
 
-enum class StringToIntError
-{
+enum class StringToIntError {
     Empty,
     InvalidDigit,
     Overflow,
     StartsWithZero
 };
-constexpr std::string_view to_string(StringToIntError e) noexcept
-{
-    switch (e)
-    {
+constexpr std::string_view to_string(StringToIntError e) noexcept {
+    switch (e) {
     case StringToIntError::Empty:
         return "Empty";
     case StringToIntError::InvalidDigit:
@@ -60,10 +62,8 @@ constexpr std::string_view to_string(StringToIntError e) noexcept
     return "UnknownStringToIntError";
 }
 
-constexpr std::string_view explain(StringToIntError e) noexcept
-{
-    switch (e)
-    {
+constexpr std::string_view explain(StringToIntError e) noexcept {
+    switch (e) {
     case StringToIntError::Empty:
         return "The input string is empty and cannot be converted to an integer.";
     case StringToIntError::InvalidDigit:

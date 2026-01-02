@@ -10,9 +10,7 @@
 
 namespace ds_lang {
 
-void Lexer::compute_line_col_at(std::string_view code, usize pos, int& line, int& col)
-{
-    // absolute 0-based (line,col)
+void Lexer::compute_line_col_at(std::string_view code, usize pos, int &line, int &col) {
     line = 0;
     col = 0;
     for (usize i = 0; i < pos; ++i) {
@@ -25,16 +23,36 @@ void Lexer::compute_line_col_at(std::string_view code, usize pos, int& line, int
     }
 }
 
-TokenKind Lexer::determine_token_kind(std::string_view lexeme, int line, int column) const
-{
+static TokenKind keyword_or_identifier(std::string_view s) {
+    if (s == "LET")
+        return TokenKind::KWLet;
+    if (s == "PRINT")
+        return TokenKind::KWPrint;
+    if (s == "FUNC")
+        return TokenKind::KWFunc;
+    if (s == "RETURN")
+        return TokenKind::KWReturn;
+    if (s == "IF")
+        return TokenKind::KWIf;
+    if (s == "THEN")
+        return TokenKind::KWThen;
+    if (s == "ELSE")
+        return TokenKind::KWElse;
+    if (s == "WHILE")
+        return TokenKind::KWWhile;
+    if (s == "DO")
+        return TokenKind::KWDo;
+    if (s == "END")
+        return TokenKind::KWEnd;
+    return TokenKind::Identifier;
+}
+
+TokenKind Lexer::determine_token_kind(std::string_view lexeme, int line, int column) const {
     if (lexeme.empty()) {
         throw std::runtime_error("Cannot build token out of empty lexeme");
     }
 
-    if (lexeme == "LET")   return TokenKind::KWLet;
-    if (lexeme == "PRINT") return TokenKind::KWPrint;
-    if (lexeme == "=")     return TokenKind::OpEqual;
-
+    // Integer literal (no sign here; '-' is an operator token)
     if (char_is_digit(lexeme[0])) {
         auto res = string_to_i64(lexeme);
         if (!res) {
@@ -46,22 +64,20 @@ TokenKind Lexer::determine_token_kind(std::string_view lexeme, int line, int col
         return TokenKind::Integer;
     }
 
+    // Identifier / keyword
     if (!is_valid_identifier(lexeme)) {
         throw std::runtime_error(std::format(
             "The lexeme {} is not a valid identifier! (line={},column={})",
             lexeme, line, column));
     }
-
-    return TokenKind::Identifier;
+    return keyword_or_identifier(lexeme);
 }
 
-std::vector<Token> Lexer::tokenize_all() const
-{
+std::vector<Token> Lexer::tokenize_all() const {
     return tokenize_range(0, code_.size());
 }
 
-std::vector<Token> Lexer::tokenize_range(usize left, usize right) const
-{
+std::vector<Token> Lexer::tokenize_range(usize left, usize right) const {
     if (left > right || right > code_.size()) {
         throw std::runtime_error(std::format(
             "tokenize_range: invalid range [{}, {}) for code size {}",
@@ -85,12 +101,17 @@ std::vector<Token> Lexer::tokenize_range(usize left, usize right) const
         col = 0;
     };
 
+    auto emit = [&](TokenKind kind, usize start, usize len, int tok_line, int tok_col) {
+        out.emplace_back(kind, code_.substr(start, len), tok_line, tok_col);
+    };
+
     while (true) {
         if (pos >= right) {
             out.emplace_back(TokenKind::Eof, std::string_view{}, line, col);
             break;
         }
 
+        // skip horizontal whitespace
         while (pos < right && is_hspace(code_[pos])) {
             new_char();
         }
@@ -99,6 +120,7 @@ std::vector<Token> Lexer::tokenize_range(usize left, usize right) const
             break;
         }
 
+        // newline token
         if (is_newline(code_[pos])) {
             out.emplace_back(TokenKind::Newline, code_.substr(pos, 1), line, col);
             new_line();
@@ -109,19 +131,143 @@ std::vector<Token> Lexer::tokenize_range(usize left, usize right) const
         const int tok_line = line;
         const int tok_col = col;
 
-        while (pos < right && !is_hspace(code_[pos]) && !is_newline(code_[pos])) {
-            new_char();
+        // ----- multi-char operators (must check before single-char) -----
+        if (pos + 1 < right) {
+            const char a = code_[pos];
+            const char b = code_[pos + 1];
+
+            if (a == '=' && b == '=') {
+                emit(TokenKind::OpEqEq, start, 2, tok_line, tok_col);
+                new_char();
+                new_char();
+                continue;
+            }
+            if (a == '!' && b == '=') {
+                emit(TokenKind::OpNeq, start, 2, tok_line, tok_col);
+                new_char();
+                new_char();
+                continue;
+            }
+            if (a == '<' && b == '=') {
+                emit(TokenKind::OpLe, start, 2, tok_line, tok_col);
+                new_char();
+                new_char();
+                continue;
+            }
+            if (a == '>' && b == '=') {
+                emit(TokenKind::OpGe, start, 2, tok_line, tok_col);
+                new_char();
+                new_char();
+                continue;
+            }
+            if (a == '&' && b == '&') {
+                emit(TokenKind::OpAndAnd, start, 2, tok_line, tok_col);
+                new_char();
+                new_char();
+                continue;
+            }
+            if (a == '|' && b == '|') {
+                emit(TokenKind::OpOrOr, start, 2, tok_line, tok_col);
+                new_char();
+                new_char();
+                continue;
+            }
         }
 
-        const std::string_view lex = code_.substr(start, pos - start);
-        out.emplace_back(
-            determine_token_kind(lex, tok_line, tok_col),
-            lex,
-            tok_line,
-            tok_col
-        );
+        // ----- single-char punctuation/operators -----
+        switch (code_[pos]) {
+        case '(':
+            emit(TokenKind::LParen, start, 1, tok_line, tok_col);
+            new_char();
+            continue;
+        case ')':
+            emit(TokenKind::RParen, start, 1, tok_line, tok_col);
+            new_char();
+            continue;
+        case ',':
+            emit(TokenKind::Comma, start, 1, tok_line, tok_col);
+            new_char();
+            continue;
+
+        case '=':
+            emit(TokenKind::OpAssign, start, 1, tok_line, tok_col);
+            new_char();
+            continue;
+        case '+':
+            emit(TokenKind::OpPlus, start, 1, tok_line, tok_col);
+            new_char();
+            continue;
+        case '-':
+            emit(TokenKind::OpMinus, start, 1, tok_line, tok_col);
+            new_char();
+            continue;
+        case '*':
+            emit(TokenKind::OpStar, start, 1, tok_line, tok_col);
+            new_char();
+            continue;
+        case '/':
+            emit(TokenKind::OpSlash, start, 1, tok_line, tok_col);
+            new_char();
+            continue;
+        case '%':
+            emit(TokenKind::OpPercent, start, 1, tok_line, tok_col);
+            new_char();
+            continue;
+
+        case '!':
+            emit(TokenKind::OpBang, start, 1, tok_line, tok_col);
+            new_char();
+            continue;
+
+        case '<':
+            emit(TokenKind::OpLt, start, 1, tok_line, tok_col);
+            new_char();
+            continue;
+        case '>':
+            emit(TokenKind::OpGt, start, 1, tok_line, tok_col);
+            new_char();
+            continue;
+        default:
+            break;
+        }
+
+        // ----- integer literal -----
+        if (char_is_digit(code_[pos])) {
+            while (pos < right && char_is_digit(code_[pos])) {
+                new_char();
+            }
+            const std::string_view lex = code_.substr(start, pos - start);
+            emit(TokenKind::Integer, start, pos - start, tok_line, tok_col);
+
+            // validate by calling determine_token_kind (keeps your error handling consistent)
+            (void)determine_token_kind(lex, tok_line, tok_col);
+            continue;
+        }
+
+        // ----- identifier / keyword -----
+        if (char_is_valid_for_identifier(code_[pos])) {
+            new_char();
+            while (pos < right && (char_is_valid_for_identifier(code_[pos]) || char_is_digit(code_[pos]))) {
+                new_char();
+            }
+            const std::string_view lex = code_.substr(start, pos - start);
+
+            // validate identifier and map keywords
+            if (!is_valid_identifier(lex)) {
+                throw std::runtime_error(std::format(
+                    "Invalid identifier {} (line={},column={})",
+                    lex, tok_line, tok_col));
+            }
+
+            emit(keyword_or_identifier(lex), start, pos - start, tok_line, tok_col);
+            continue;
+        }
+
+        // Unknown character
+        throw std::runtime_error(std::format(
+            "Unexpected character {:?} (line={},column={})",
+            code_.substr(pos, 1), tok_line, tok_col));
     }
-    assert(pos >= right);
 
     return out;
 }

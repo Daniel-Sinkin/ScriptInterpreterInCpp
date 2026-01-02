@@ -1,2 +1,6 @@
-LET x = 5
-PRINT x
+LET x = 10
+WHILE x > 5 DO
+    PRINT x
+    LET x = x - 1
+END
+RETURN 0

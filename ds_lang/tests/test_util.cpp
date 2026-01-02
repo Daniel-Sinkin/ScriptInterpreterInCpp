@@ -1,49 +1,42 @@
 // tests/test_util.cpp
 #include "common.hpp"
 
-#include <print>
 #include <limits>
+#include <print>
 #include <string_view>
 
 #include "types.hpp"
 #include "util.hpp"
 
-namespace ds_lang::Test
-{
-static void expect_ok(std::string_view s, i64 expected)
-{
+namespace ds_lang::Test {
+static void expect_ok(std::string_view s, i64 expected) {
     auto r = ds_lang::string_to_i64(s);
     EXPECT_TRUE(r.has_value());
     EXPECT_EQ(*r, expected);
 }
 
-static void expect_err(std::string_view s, ds_lang::StringToIntError expected)
-{
+static void expect_err(std::string_view s, ds_lang::StringToIntError expected) {
     auto r = ds_lang::string_to_i64(s);
     EXPECT_TRUE(!r.has_value());
     EXPECT_EQ(r.error(), expected);
 }
 
-static void test_empty()
-{
+static void test_empty() {
     expect_err("", ds_lang::StringToIntError::Empty);
 }
 
-static void test_single_zero_ok()
-{
+static void test_single_zero_ok() {
     // Only fails if you disallow "0" entirely; most implementations accept it.
     expect_ok("0", 0);
 }
 
-static void test_starts_with_zero()
-{
+static void test_starts_with_zero() {
     // Assumes your implementation forbids leading zeros for multi-digit numbers.
     expect_err("01", ds_lang::StringToIntError::StartsWithZero);
     expect_err("000", ds_lang::StringToIntError::StartsWithZero);
 }
 
-static void test_invalid_digit()
-{
+static void test_invalid_digit() {
     expect_err("1a", ds_lang::StringToIntError::InvalidDigit);
     expect_err("a1", ds_lang::StringToIntError::InvalidDigit);
     expect_err("-", ds_lang::StringToIntError::InvalidDigit);
@@ -51,22 +44,19 @@ static void test_invalid_digit()
     expect_err("12 3", ds_lang::StringToIntError::InvalidDigit);
 }
 
-static void test_ok_small_values()
-{
+static void test_ok_small_values() {
     expect_ok("7", 7);
     expect_ok("42", 42);
     expect_ok("123456", 123456);
 }
 
-static void test_int64_max_ok()
-{
+static void test_int64_max_ok() {
     // i64 is std::int64_t per your types.hpp
     constexpr auto max_str = "9223372036854775807";
     expect_ok(max_str, std::numeric_limits<ds_lang::i64>::max());
 }
 
-static void test_overflow()
-{
+static void test_overflow() {
     // One above INT64_MAX
     constexpr auto overflow_str = "9223372036854775808";
     expect_err(overflow_str, ds_lang::StringToIntError::Overflow);
@@ -77,11 +67,13 @@ static void test_overflow()
 
 } // namespace ds_lang::Test
 
-int main()
-{
+int main() {
     using namespace ds_lang::Test;
 
-    struct TestCase { const char* name; void (*fn)(); };
+    struct TestCase {
+        const char *name;
+        void (*fn)();
+    };
 
     const TestCase tests[] = {
         {"util.string_to_i64.empty", test_empty},
@@ -93,10 +85,10 @@ int main()
         {"util.string_to_i64.overflow", test_overflow},
     };
 
-    for (const auto& t : tests) {
+    for (const auto &t : tests) {
         try {
             t.fn();
-        } catch (const std::exception& e) {
+        } catch (const std::exception &e) {
             std::println("FAIL {}: {}", t.name, e.what());
             return 1;
         } catch (...) {

@@ -65,7 +65,7 @@ string_to_i64(std::string_view word) noexcept {
     const u64 limit = (sign < 0) ? neg_limit : pos_limit;
 
     u64 acc = 0;
-    while(i < word.size()) {
+    while (i < word.size()) {
         const char c = word[i];
         if (!char_is_digit(c))
             return std::unexpected{E::InvalidDigit};

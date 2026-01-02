@@ -1,37 +1,122 @@
 // ds_lang/include/token.hpp
 #pragma once
-#include <string_view>
-#include <format>
 
-namespace ds_lang
-{
+#include <format>
+#include <string_view>
+
+namespace ds_lang {
 enum class TokenKind {
-    Identifier,
-    Integer,
-    KWLet,
-    KWPrint,
-    OpEqual,
-    Newline,
-    Eof
+    Identifier, // variable / function name
+    Integer,    // integer literal
+
+    KWLet,      // LET
+    KWPrint,    // PRINT
+    KWFunc,     // FUNC
+    KWReturn,   // RETURN
+    KWIf,       // IF
+    KWThen,     // THEN
+    KWElse,     // ELSE
+    KWWhile,    // WHILE
+    KWDo,       // DO
+    KWEnd,      // END
+
+    LParen,     // (
+    RParen,     // )
+    Comma,      // ,
+
+    OpAssign,   // =
+    OpPlus,     // +
+    OpMinus,    // -
+    OpStar,     // *
+    OpSlash,    // /
+    OpPercent,  // %
+    OpEqEq,     // ==
+    OpNeq,      // !=
+    OpLt,       // <
+    OpLe,       // <=
+    OpGt,       // >
+    OpGe,       // >=
+    OpAndAnd,   // &&
+    OpOrOr,     // ||
+    OpBang,     // !
+
+    Newline,    // end of statement
+    Eof         // end of input
 };
+
 struct Token {
     TokenKind kind;
     std::string_view lexeme;
     int line;
     int column;
 };
+
 constexpr std::string_view to_string(TokenKind k) noexcept {
     switch (k) {
     case TokenKind::Identifier:
         return "Identifier";
     case TokenKind::Integer:
         return "Integer";
+
     case TokenKind::KWLet:
         return "KWLet";
     case TokenKind::KWPrint:
         return "KWPrint";
-    case TokenKind::OpEqual:
-        return "OpEqual";
+    case TokenKind::KWFunc:
+        return "KWFunc";
+    case TokenKind::KWReturn:
+        return "KWReturn";
+    case TokenKind::KWIf:
+        return "KWIf";
+    case TokenKind::KWThen:
+        return "KWThen";
+    case TokenKind::KWElse:
+        return "KWElse";
+    case TokenKind::KWWhile:
+        return "KWWhile";
+    case TokenKind::KWDo:
+        return "KWDo";
+    case TokenKind::KWEnd:
+        return "KWEnd";
+
+    case TokenKind::LParen:
+        return "LParen";
+    case TokenKind::RParen:
+        return "RParen";
+    case TokenKind::Comma:
+        return "Comma";
+
+    case TokenKind::OpAssign:
+        return "OpAssign";
+    case TokenKind::OpPlus:
+        return "OpPlus";
+    case TokenKind::OpMinus:
+        return "OpMinus";
+    case TokenKind::OpStar:
+        return "OpStar";
+    case TokenKind::OpSlash:
+        return "OpSlash";
+    case TokenKind::OpPercent:
+        return "OpPercent";
+    case TokenKind::OpEqEq:
+        return "OpEqEq";
+    case TokenKind::OpNeq:
+        return "OpNeq";
+    case TokenKind::OpLt:
+        return "OpLt";
+    case TokenKind::OpLe:
+        return "OpLe";
+    case TokenKind::OpGt:
+        return "OpGt";
+    case TokenKind::OpGe:
+        return "OpGe";
+    case TokenKind::OpAndAnd:
+        return "OpAndAnd";
+    case TokenKind::OpOrOr:
+        return "OpOrOr";
+    case TokenKind::OpBang:
+        return "OpBang";
+
     case TokenKind::Newline:
         return "Newline";
     case TokenKind::Eof:
@@ -46,12 +131,66 @@ constexpr std::string_view explain(TokenKind k) noexcept {
         return "A user-defined name (variable or function identifier).";
     case TokenKind::Integer:
         return "A base-10 integer literal.";
+
     case TokenKind::KWLet:
         return "Keyword introducing a variable definition or assignment.";
     case TokenKind::KWPrint:
         return "Keyword for printing a value to standard output.";
-    case TokenKind::OpEqual:
+    case TokenKind::KWFunc:
+        return "Keyword introducing a function definition.";
+    case TokenKind::KWReturn:
+        return "Keyword returning a value from a function.";
+    case TokenKind::KWIf:
+        return "Keyword starting a conditional expression or statement.";
+    case TokenKind::KWThen:
+        return "Keyword separating the condition from the then-branch.";
+    case TokenKind::KWElse:
+        return "Keyword introducing the else-branch.";
+    case TokenKind::KWWhile:
+        return "Keyword starting a while loop.";
+    case TokenKind::KWDo:
+        return "Keyword starting the body of a while loop.";
+    case TokenKind::KWEnd:
+        return "Keyword terminating a block (IF/WHILE/FUNC).";
+
+    case TokenKind::LParen:
+        return "Left parenthesis “(”.";
+    case TokenKind::RParen:
+        return "Right parenthesis “)”.";
+    case TokenKind::Comma:
+        return "Comma “,” separator.";
+
+    case TokenKind::OpAssign:
         return "Assignment operator “=”.";
+    case TokenKind::OpPlus:
+        return "Addition operator “+”.";
+    case TokenKind::OpMinus:
+        return "Subtraction operator “-”.";
+    case TokenKind::OpStar:
+        return "Multiplication operator “*”.";
+    case TokenKind::OpSlash:
+        return "Division operator “/”.";
+    case TokenKind::OpPercent:
+        return "Modulo operator “%”.";
+    case TokenKind::OpEqEq:
+        return "Equality comparison operator “==”.";
+    case TokenKind::OpNeq:
+        return "Inequality comparison operator “!=”.";
+    case TokenKind::OpLt:
+        return "Less-than comparison operator “<”.";
+    case TokenKind::OpLe:
+        return "Less-than-or-equal comparison operator “<=”.";
+    case TokenKind::OpGt:
+        return "Greater-than comparison operator “>”.";
+    case TokenKind::OpGe:
+        return "Greater-than-or-equal comparison operator “>=”.";
+    case TokenKind::OpAndAnd:
+        return "Logical AND operator “&&”.";
+    case TokenKind::OpOrOr:
+        return "Logical OR operator “||”.";
+    case TokenKind::OpBang:
+        return "Logical NOT operator “!”.";
+
     case TokenKind::Newline:
         return "Newline token that terminates a statement.";
     case TokenKind::Eof:
@@ -65,17 +204,19 @@ constexpr std::string_view explain(TokenKind k) noexcept {
 template <>
 struct std::formatter<ds_lang::TokenKind> : std::formatter<std::string_view> {
     auto format(ds_lang::TokenKind k, format_context &ctx) const {
-        return std::formatter<std::string_view>::format(ds_lang::to_string(k),
-                                                        ctx);
+        return std::formatter<std::string_view>::format(ds_lang::to_string(k), ctx);
     }
 };
 
 template <>
 struct std::formatter<ds_lang::Token> : std::formatter<std::string_view> {
     auto format(const ds_lang::Token &t, format_context &ctx) const {
-        // Example: Token{kind=KWLet, lexeme="LET", line=0, column=0}
         return std::format_to(
-            ctx.out(), "Token{{kind={}, lexeme={:?}, line={}, column={}}}",
-            t.kind, t.lexeme, t.line, t.column);
+            ctx.out(),
+            "Token{{kind={}, lexeme={:?}, line={}, column={}}}",
+            t.kind,
+            t.lexeme,
+            t.line,
+            t.column);
     }
 };

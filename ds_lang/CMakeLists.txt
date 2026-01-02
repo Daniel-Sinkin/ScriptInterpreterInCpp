@@ -20,7 +20,6 @@ target_include_directories(ds_lang
 
 target_compile_features(ds_lang PUBLIC cxx_std_23)
 
-# Common warnings/settings for all targets in this project
 add_library(ds_lang_warnings INTERFACE)
 
 if (MSVC)
@@ -52,9 +51,6 @@ target_compile_features(ds_lang_cli PRIVATE cxx_std_23)
 
 enable_testing()
 
-# ============================================================
-# Lexer tests (single binary, multiple ctest entries via --case)
-# ============================================================
 add_executable(ds_lang_tests
     tests/test_lexer.cpp
 )
@@ -81,9 +77,6 @@ foreach(tc IN LISTS LEXER_TEST_CASES)
              COMMAND ds_lang_tests --case ${tc})
 endforeach()
 
-# ============================================================
-# Util tests (single binary, multiple ctest entries via --case)
-# ============================================================
 add_executable(ds_lang_util_tests
     tests/test_util.cpp
 )
