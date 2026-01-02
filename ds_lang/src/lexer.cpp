@@ -66,7 +66,7 @@ tokenize_word(std::string_view word)
 tokenize_next_statement(std::string_view code, size_t &idx)
 {
     Tokens statement;
-    while (idx < code.length() && char_is_whitespace(code[idx]))
+    while (idx < code.length() && is_whitespace(code[idx]))
     {
         ++idx;
     }
@@ -79,7 +79,7 @@ tokenize_next_statement(std::string_view code, size_t &idx)
 
     while (idx < code.length())
     {
-        while (idx < code.length() && char_is_whitespace(code[idx]))
+        while (idx < code.length() && is_whitespace(code[idx]))
         { // Skips whitespace
             ++idx;
         }
@@ -91,7 +91,7 @@ tokenize_next_statement(std::string_view code, size_t &idx)
         while (curr_idx < code.length())
         { // Consume chars until hitting whitespace or ';'
             char c = code[curr_idx];
-            if (char_is_whitespace(c))
+            if (is_whitespace(c))
             {
                 break;
             }

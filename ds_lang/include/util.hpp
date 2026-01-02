@@ -10,7 +10,7 @@ namespace ds_lang
 {
 std::string load_code(const std::string& path);
 
-constexpr bool char_is_whitespace(char c) noexcept
+constexpr bool is_whitespace(char c) noexcept
 {
     return c == ' ' || c == '\t' ||
            c == '\n' || c == '\r' ||

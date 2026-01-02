@@ -1,119 +1,45 @@
-// app/main.cpp
-#include <algorithm>
-#include <cassert>
-#include <expected>
-#include <fstream>
-#include <functional>
-#include <iostream>
-#include <memory>
-#include <optional>
 #include <print>
-#include <span>
-#include <sstream>
-#include <stdexcept>
 #include <string>
-#include <string_view>
-#include <unordered_map>
-#include <utility>
-#include <variant>
 #include <vector>
 
-#include "ast.hpp"
-#include "env.hpp"
-#include "interpreter.hpp"
-#include "lexer.hpp"
-#include "parser.hpp"
-#include "token.hpp"
-#include "types.hpp"
 #include "util.hpp"
+#include "types.hpp"
 
-namespace ds_lang
-{
-void print_env(const Environment &env)
-{
-    std::println("Environment =");
-    std::println("\t{{");
-
-    bool first = true;
-    for (const auto &[key, value] : env.variables_)
-    {
-        if (!first) std::println(",");
-        first = false;
-        std::print("\t\t\"{}\": {}", key, value);
-    }
-
-    if (!first) std::println();
-    std::println("\t}};");
-}
-} // namespace ds_lang
-
-int main(int argc, char **argv)
+int main()
 {
     using namespace ds_lang;
 
-    Environment env;
+    load_code("examples/new.ds2");
 
-    // File mode (optional)
-    if (argc == 2)
+    std::string code = "LET x = 1\nPRINT x";
+
+    std::vector<std::vector<std::string>> lines;
+
+    usize current_pos = 0;
+    while (current_pos < code.size())
     {
-        const std::string code = load_code(argv[1]);
-        const auto stmts = tokenize_code(code);
-        for (const auto &toks : stmts)
+        std::vector<std::string> words;
+        // Process current line
+        while (current_pos < code.size() && code[current_pos] != '\n')
         {
-            auto st = parse_statement(toks);
-            if (!st)
+            // Skip till new word
+            while (current_pos < code.size() && code[current_pos] != '\n' && is_whitespace(code[current_pos]))
             {
-                std::println("Parse error.");
-                return 1;
+                ++current_pos;
             }
-            auto ex = execute_statement(env, *st);
-            if (!ex)
+            if (current_pos >= code.size() || code[current_pos] == '\n') break;
+
+            usize start = current_pos;
+            while (current_pos < code.size() && code[current_pos] != ' ' && code[current_pos] != '\n')
             {
-                std::println("Execution error.");
-                return 1;
+                ++current_pos;
             }
+
+            words.push_back(code.substr(start, current_pos - start));
         }
-        return 0;
+        lines.push_back(std::move(words));
+        if (current_pos < code.size() && code[current_pos] == '\n') ++current_pos;
     }
 
-    // Interactive mode
-    std::println("Interactive mode (Ctrl-D to exit).");
-
-    std::string line;
-    while (true)
-    {
-        std::print("> ");
-        if (!std::getline(std::cin, line)) break;
-
-        if (line.empty()) continue;
-
-        if (line == "exit" || line == "quit") break;
-
-        if (!line.ends_with(';')) line.push_back(';');
-
-        const auto stmts = tokenize_code(line);
-        if (stmts.empty()) continue;
-
-        for (const auto &toks : stmts)
-        {
-            auto st = parse_statement(toks);
-            if (!st)
-            {
-                auto err = st.error();
-                std::println("Failed to parse statement: {} [{}]", explain(err), to_string(err));
-                continue;
-            }
-
-            auto ex = execute_statement(env, *st);
-            if (!ex)
-            {
-                auto err = ex.error().expression_error;
-                std::println("Failed to execute statement: {} [{}]", explain(err), to_string(err));
-                continue;
-            }
-        }
-    }
-
-    std::println("Bye.");
-    return 0;
+    std::println("{}", lines);
 }
