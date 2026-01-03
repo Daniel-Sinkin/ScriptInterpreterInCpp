@@ -12,16 +12,34 @@
 int main() {
     using namespace ds_lang;
 
-    std::string code = load_code("examples/simple.ds");
+    std::string file_name = "examples/func.ds";
+    std::string code = load_code(file_name);
+
+    std::println("------------------------------------------------");
+    std::println("> {}", file_name);
+    std::println("------------------------------------------------");
+    int line_counter = 0;
+    std::print("[{:03}] ", line_counter);
+    for(const char c : code) {
+        std::print("{}", c);
+        if (c == '\n') {
+            std::print("[{:03}] ", ++line_counter);
+        }
+    }
+    std::println();
+    std::println("------------------------------------------------");
+    std::println("");
 
     Lexer lexer{code};
     std::vector<Token> tokens = lexer.tokenize_all();
     Parser parser{tokens};
 
-    for (const auto &statement : parser.parse_scope()) {
-        std::println("{}", statement);
-    }
+    auto statements = parser.parse_scope();
 
-    // Interpreter interpreter{false};
-    // interpreter.process_scope(parser.parse_scope());
+    Interpreter interpreter{true};
+
+    std::println("Running Interpreter on the code");
+    interpreter.process_scope(statements);
+
+    std::println("");
 }

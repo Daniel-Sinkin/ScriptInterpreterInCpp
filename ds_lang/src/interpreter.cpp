@@ -1,5 +1,6 @@
 // ds_lang/src/interpreter.cpp
 #include <algorithm>
+#include <cstddef>
 #include <optional>
 #include <print>
 #include <stdexcept>
@@ -47,7 +48,7 @@ Interpreter::~Interpreter() noexcept {
     } catch (...) {
     }
 }
-i64 Interpreter::evaluate_expression(const Expression &expr) const {
+i64 Interpreter::evaluate_expression(const Expression &expr) {
     // TODO: Add error handling and propagating
     return std::visit(
         overloaded{
@@ -127,19 +128,67 @@ i64 Interpreter::evaluate_expression(const Expression &expr) const {
                 }
                 std::unreachable();
             },
-        },
+            [&](const CallExpression &s) -> i64 {
+                auto *id = std::get_if<IdentifierExpression>(&s.callee->node);
+                assert(id && "CallExpression must have IdentifierExpression callee");
+                FunctionStatement &func = funcs_.at(id->name);
+
+                if (func.vars.size() != s.args.size()) {
+                    throw std::runtime_error(std::format(
+                        "When calling {} function we expected {} arguments but got {}",
+                        func.func_name, func.vars.size(), s.args.size()));
+                }
+
+                const auto caller_vars = vars_;
+
+                ScopeExit restore{[&] {
+                    vars_ = caller_vars;
+                    for (const auto &[k, v] : caller_vars) {
+                        auto it = vars_.find(k);
+                        if (it == vars_.end() || it->second != v) {
+                            throw std::runtime_error(std::format(
+                                "Function call corrupted outer scope variable '{}'", k));
+                        }
+                    }
+                }};
+
+                for (usize i = 0; i < func.vars.size(); ++i) {
+                    const std::string &name = func.vars[i];
+                    if (vars_.contains(name)) {
+                        throw std::runtime_error(std::format(
+                            "Variable shadowing is not allowed! Tried to set already existing variable '{}'",
+                            name));
+                    }
+                    vars_.emplace(name, evaluate_expression(*s.args[i]));
+                }
+
+                const ExecResult retval = process_scope(func.statements);
+                if (retval == ExecResult::Error) {
+                    throw std::runtime_error(std::format(
+                        "Error in function scope of {}", func.func_name));
+                }
+                if (retval == ExecResult::Continue) {
+                    throw std::runtime_error(std::format(
+                        "Function {} must RETURN, but did not.", func.func_name));
+                }
+
+                assert(return_value_);
+                const i64 tmp = *return_value_;
+                return_value_ = std::nullopt;
+                return tmp;
+            }},
         expr.node);
 }
 
-Interpreter::ExecResult Interpreter::process_statement(const Statement &statement) {
+Interpreter::ExecResult Interpreter::process_statement(Statement &statement) {
     return std::visit(
         overloaded{
-            [&](const LetStatement &s) -> ExecResult {
+            [&](LetStatement &s) -> ExecResult {
                 assert(s.expr);
                 vars_.insert_or_assign(s.identifier, evaluate_expression(*s.expr));
                 return ExecResult::Continue;
             },
-            [&](const PrintStatement &s) -> ExecResult {
+            [&](PrintStatement &s) -> ExecResult {
                 assert(s.expr);
                 i64 res = evaluate_expression(*s.expr);
                 print_buffer_.push_back(res);
@@ -148,21 +197,21 @@ Interpreter::ExecResult Interpreter::process_statement(const Statement &statemen
                 }
                 return ExecResult::Continue;
             },
-            [&](const ReturnStatement &s) -> ExecResult {
+            [&](ReturnStatement &s) -> ExecResult {
                 assert(s.expr);
                 return_value_ = evaluate_expression(*s.expr);
                 return ExecResult::Return;
             },
-            [&](const IfStatement &s) -> ExecResult {
+            [&](IfStatement &s) -> ExecResult {
                 assert(s.if_expr);
                 if (evaluate_expression(*s.if_expr) > 0) {
-                    process_statement(*s.then_statement);
+                    process_scope(s.then_scope);
                 } else {
-                    process_statement(*s.else_statement);
+                    process_scope(s.else_scope);
                 }
                 return ExecResult::Continue;
             },
-            [&](const WhileStatement &s) -> ExecResult {
+            [&](WhileStatement &s) -> ExecResult {
                 assert(s.while_expr);
                 while ((evaluate_expression(*s.while_expr))) {
                     assert(!s.do_scope.empty());
@@ -170,17 +219,16 @@ Interpreter::ExecResult Interpreter::process_statement(const Statement &statemen
                 }
                 return ExecResult::Continue;
             },
-            [&](const FunctionStatement &s) -> ExecResult {
-                (void)s;
-                throw std::runtime_error("not implemented yet");
+            [&](FunctionStatement &s) -> ExecResult {
+                funcs_.insert_or_assign(s.func_name, std::move(s));
                 return ExecResult::Continue;
             },
         },
         statement.node);
 }
 
-Interpreter::ExecResult Interpreter::process_scope(const std::vector<Statement> &statements) {
-    for (const Statement &statement : statements) {
+Interpreter::ExecResult Interpreter::process_scope(std::vector<Statement> &statements) {
+    for (Statement &statement : statements) {
         const ExecResult res = process_statement(statement);
         if (res != ExecResult::Continue) {
             return res;

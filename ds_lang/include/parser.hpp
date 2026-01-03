@@ -12,6 +12,7 @@
 #include "types.hpp"
 
 namespace ds_lang {
+
 enum class BinaryOp {
     Add, // +
     Sub, // -
@@ -57,12 +58,18 @@ struct BinaryExpression {
     std::unique_ptr<Expression> rhs;
 };
 
+struct CallExpression {
+    std::unique_ptr<Expression> callee;
+    std::vector<std::unique_ptr<Expression>> args;
+};
+
 struct Expression {
     using Variant = std::variant<
         IntegerExpression,
         IdentifierExpression,
         UnaryExpression,
-        BinaryExpression>;
+        BinaryExpression,
+        CallExpression>;
 
     Variant node;
 };
@@ -84,10 +91,8 @@ struct ReturnStatement {
 
 struct IfStatement {
     std::unique_ptr<Expression> if_expr;
-    // Need a variable SCOPE not a single statement, a scope would be a std::vector of statements
-    std::unique_ptr<Statement> then_statement;
-    // Need a variable SCOPE not a single statement, a scope would be a std::vector of statements
-    std::unique_ptr<Statement> else_statement;
+    std::vector<Statement> then_scope;
+    std::vector<Statement> else_scope;
 };
 
 struct WhileStatement {
@@ -96,9 +101,9 @@ struct WhileStatement {
 };
 
 struct FunctionStatement {
-    std::string_view func_name;
-    std::vector<std::string_view> vars;
-    std::unique_ptr<Statement> statement;
+    std::string func_name;
+    std::vector<std::string> vars;
+    std::vector<Statement> statements;
 };
 
 struct Statement {
@@ -120,6 +125,9 @@ public:
     Parser() = delete;
     Parser(const Parser &) = default;
     Parser &operator=(const Parser &) = delete;
+
+    static constexpr int kUnaryPrec = 80;
+    static constexpr int kCallPrec = 90;
 
     [[nodiscard]] Statement parse_statement();
     [[nodiscard]] std::vector<Statement> parse_scope(); // Parse statements until you see an END or EOF

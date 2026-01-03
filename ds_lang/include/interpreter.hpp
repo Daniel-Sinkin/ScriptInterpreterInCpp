@@ -13,7 +13,7 @@ public:
         : immediate_print_{immediate_print} {}
     ~Interpreter() noexcept;
 
-    i64 evaluate_expression(const Expression &expr) const;
+    i64 evaluate_expression(const Expression &expr);
 
     enum class ExecResult {
         Continue,
@@ -21,13 +21,17 @@ public:
         Error
     };
 
-    ExecResult process_statement(const Statement &statement);
-    ExecResult process_scope(const std::vector<Statement> &statements);
+    ExecResult process_statement(Statement &statement);
+    ExecResult process_scope(std::vector<Statement> &statements);
+
 
 private:
     std::unordered_map<std::string, i64> vars_{};
+    std::unordered_map<std::string, FunctionStatement> funcs_{};
     std::optional<i64> return_value_{};
     std::vector<i64> print_buffer_{};
     bool immediate_print_{true};
+
+
 };
 } // namespace ds_lang

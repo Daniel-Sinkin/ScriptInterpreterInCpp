@@ -5,10 +5,12 @@
 #include <stdexcept>
 #include <string_view>
 #include <utility>
+#include <variant>
 
 #include "parser.hpp"
 #include "token.hpp"
 #include "util.hpp"
+#include "formatters.hpp"
 
 namespace ds_lang {
 bool Parser::at_end() const noexcept {
@@ -59,6 +61,7 @@ void Parser::error_here(std::string_view msg) const {
         t.line,
         t.column));
 }
+
 
 int Parser::infix_lbp(TokenKind k) noexcept {
     switch (k) {
@@ -160,8 +163,6 @@ UnaryOp Parser::to_unary_op(TokenKind k) {
     }
 }
 
-// ===== Pratt parser =====
-
 std::unique_ptr<Expression> Parser::parse_expression() {
     return parse_expr_bp(0);
 }
@@ -176,15 +177,41 @@ std::unique_ptr<Expression> Parser::parse_expr_bp(int min_bp) {
 
     while (!at_end()) {
         const TokenKind k = peek().kind;
-        if(is_expr_terminator(k)) break;
+
+        if (k == TokenKind::LParen && kCallPrec >= min_bp) { // Handle postfix function calls
+            if (!std::holds_alternative<IdentifierExpression>(lhs->node)) {
+                error_here("Only identifiers can be called as functions");
+            }
+
+            (void)advance(); // consume '('
+
+            std::vector<std::unique_ptr<Expression>> args;
+            if (peek().kind != TokenKind::RParen) {
+                while (true) {
+                    args.push_back(parse_expr_bp(0));
+                    if (match(TokenKind::Comma)) {
+                        continue;
+                    }
+                    break;
+                }
+            }
+            (void)consume(TokenKind::RParen, "Expected ')' after function call arguments");
+            auto e = std::make_unique<Expression>();
+            e->node = CallExpression{
+                .callee = std::move(lhs),
+                .args = std::move(args),
+            };
+            lhs = std::move(e);
+            continue;
+        }
+
+        if (is_expr_terminator(k)) break;
 
         const int lbp = infix_lbp(k);
-        if (lbp < min_bp)
-            break;
+        if (lbp < min_bp) break;
 
-        (void)advance();
+        (void)advance(); // consume operator
         const int rbp = infix_rbp(k);
-
         auto rhs = parse_expr_bp(rbp);
 
         auto e = std::make_unique<Expression>();
@@ -198,6 +225,7 @@ std::unique_ptr<Expression> Parser::parse_expr_bp(int min_bp) {
 
     return lhs;
 }
+
 
 std::unique_ptr<Expression> Parser::nud(const Token &t) {
     // prefix operators
@@ -310,17 +338,17 @@ IfStatement Parser::parse_if_statement() {
     (void)consume(TokenKind::KWIf, "Expected 'IF' at start of assignment statement");
     auto if_expr = parse_expr_bp(0);
     (void)consume(TokenKind::KWThen, "Expected 'THEN' after 'IF' expression");
-    std::unique_ptr<Statement> then_ptr = std::make_unique<Statement>(parse_statement());
-    std::unique_ptr<Statement> else_ptr;
+    std::vector<Statement> then_scope = parse_scope();
+    std::vector<Statement> else_scope{};
     if (match(TokenKind::KWElse)) {
         skip_newlines();
-        else_ptr = std::make_unique<Statement>(parse_statement());
+        else_scope = parse_scope();
     }
     (void)consume(TokenKind::KWEnd, "Expected 'END' after if statement");
     return IfStatement{
         .if_expr = std::move(if_expr),
-        .then_statement = std::move(then_ptr),
-        .else_statement = std::move(else_ptr)};
+        .then_scope = std::move(then_scope),
+        .else_scope = std::move(else_scope)};
 }
 WhileStatement Parser::parse_while_statement() {
     (void)consume(TokenKind::KWWhile, "Expected 'WHILE' at start of assignment statement");
@@ -334,12 +362,12 @@ WhileStatement Parser::parse_while_statement() {
 }
 FunctionStatement Parser::parse_func_statement() {
     (void)consume(TokenKind::KWFunc, "Expected 'FUNC' at start of assignment statement");
-    std::string_view func_name = consume(TokenKind::Identifier, "Expected Identifier after FUNC").lexeme;
+    std::string func_name{consume(TokenKind::Identifier, "Expected Identifier after FUNC").lexeme};
     (void)consume(TokenKind::LParen, "Expected '(' after function name");
-    std::vector<std::string_view> vars;
+    std::vector<std::string> vars;
     while (peek().kind != TokenKind::RParen) {
         if (peek().kind == TokenKind::Identifier) {
-            auto name = consume(TokenKind::Identifier, "Peeked Function Var Identifier, this shouldn't fail").lexeme;
+            std::string name{consume(TokenKind::Identifier, "Peeked Function Var Identifier, this shouldn't fail").lexeme};
             if (std::ranges::contains(vars, name)) {
                 throw std::runtime_error("Duplicate function arguments");
             }
@@ -350,13 +378,13 @@ FunctionStatement Parser::parse_func_statement() {
         }
     }
     (void)consume(TokenKind::RParen, "Expected ')' after function arguments");
-    auto statement_ptr = std::make_unique<Statement>(parse_statement());
+    std::vector<Statement> statements = parse_scope();
     (void)consume(TokenKind::KWEnd, "Expected 'END' after if statement");
 
     return FunctionStatement{
-        .func_name = func_name,
-        .vars = vars,
-        .statement = std::move(statement_ptr)};
+        .func_name = std::move(func_name),
+        .vars = std::move(vars),
+        .statements = std::move(statements)};
 }
 
 } // namespace ds_lang

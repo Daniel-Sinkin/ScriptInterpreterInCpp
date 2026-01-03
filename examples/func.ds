@@ -1,4 +1,32 @@
-FUNC myfunc()
-    return 1
+FUNC pow(base, exponent)
+    LET accum = 1
+    WHILE exponent > 0 DO
+        LET accum = accum * base
+        LET exponent = exponent - 1
+    END
+    RETURN accum
 END
-return myfunc()
+
+FUNC func(my_arg)
+    LET x = 3
+    RETURN pow(x, my_arg)
+END
+
+FUNC main(arg1)
+    LET retval = func(arg1)
+    PRINT retval
+    IF retval % 2 == 0 THEN
+        LET retval = retval / 2
+    ELSE
+        LET retval = 3 * retval + 1
+    END
+    PRINT retval
+    RETURN retval
+END
+
+LET res1 = main(5)
+LET res2 = main(4)
+
+PRINT res1
+PRINT res2
+RETURN -1

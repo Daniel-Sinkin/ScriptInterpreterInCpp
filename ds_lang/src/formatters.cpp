@@ -58,13 +58,10 @@ static int precedence(BinaryOp op) noexcept {
     return -1;
 }
 
-static constexpr int kUnaryPrec = 80;
 
 static void append_indent(std::string& out, int indent) {
     out.append(static_cast<std::size_t>(indent), ' ');
 }
-
-static void format_expr_into(std::string& out, const Expression& e, int parent_prec, bool is_rhs);
 
 static void format_expr_into(std::string& out, const Expression& e, int parent_prec, bool is_rhs) {
     std::visit(
@@ -72,7 +69,7 @@ static void format_expr_into(std::string& out, const Expression& e, int parent_p
             [&](const IntegerExpression& n) { out += std::format("{}", n.value); },
             [&](const IdentifierExpression& id) { out += id.name; },
             [&](const UnaryExpression& u) {
-                const int my_prec = kUnaryPrec;
+                const int my_prec = Parser::kUnaryPrec;
                 const bool need_parens = my_prec < parent_prec;
                 if (need_parens) out.push_back('(');
 
@@ -98,6 +95,25 @@ static void format_expr_into(std::string& out, const Expression& e, int parent_p
 
                 if (b.rhs) format_expr_into(out, *b.rhs, my_prec, true);
                 else out += "<null-expr>";
+
+                if (need_parens) out.push_back(')');
+            },
+            [&](const CallExpression& c) {
+                // Calls bind tighter than unary/infix; treat as postfix.
+                const int my_prec = Parser::kCallPrec;
+                const bool need_parens = my_prec < parent_prec;
+                if (need_parens) out.push_back('(');
+
+                if (c.callee) format_expr_into(out, *c.callee, my_prec, false);
+                else out += "<null-expr>";
+
+                out.push_back('(');
+                for (std::size_t i = 0; i < c.args.size(); ++i) {
+                    if (i) out += ", ";
+                    if (c.args[i]) format_expr_into(out, *c.args[i], 0, false);
+                    else out += "<null-expr>";
+                }
+                out.push_back(')');
 
                 if (need_parens) out.push_back(')');
             },
@@ -144,16 +160,15 @@ static void format_statement_into(std::string& out, const Statement& s, int inde
                 out += st.if_expr ? format_expression(*st.if_expr) : "<null-expr>";
                 out += " THEN\n";
 
-                append_indent(out, indent + 4);
-                if (st.then_statement) format_statement_into(out, *st.then_statement, indent + 4);
-                else out += "<null-statement>";
-                out.push_back('\n');
+                if (!st.then_scope.empty()) {
+                    format_scope_into(out, st.then_scope, indent + 4);
+                    out.push_back('\n');
+                }
 
-                if (st.else_statement) {
+                if (!st.else_scope.empty()) {
                     append_indent(out, indent);
                     out += "ELSE\n";
-                    append_indent(out, indent + 4);
-                    format_statement_into(out, *st.else_statement, indent + 4);
+                    format_scope_into(out, st.else_scope, indent + 4);
                     out.push_back('\n');
                 }
 
@@ -173,20 +188,32 @@ static void format_statement_into(std::string& out, const Statement& s, int inde
                 append_indent(out, indent);
                 out += "END";
             },
+            [&](const CallExpression& c) {
+                if (c.callee) format_expr_into(out, *c.callee, Parser::kCallPrec, false);
+                else out += "<null-expr>";
+
+                out.push_back('(');
+                for (std::size_t i = 0; i < c.args.size(); ++i) {
+                    if (i) out += ", ";
+                    if (c.args[i]) format_expr_into(out, *c.args[i], 0, false);
+                    else out += "<null-expr>";
+                }
+                out.push_back(')');
+            },
             [&](const FunctionStatement& st) {
                 out += "FUNC ";
-                out += std::string(st.func_name);
+                out += st.func_name;
                 out += "(";
                 for (std::size_t i = 0; i < st.vars.size(); ++i) {
                     if (i) out += ", ";
-                    out += std::string(st.vars[i]);
+                    out += st.vars[i];
                 }
                 out += ")\n";
 
-                append_indent(out, indent + 4);
-                if (st.statement) format_statement_into(out, *st.statement, indent + 4);
-                else out += "<null-statement>";
-                out.push_back('\n');
+                if (!st.statements.empty()) {
+                    format_scope_into(out, st.statements, indent + 4);
+                    out.push_back('\n');
+                }
 
                 append_indent(out, indent);
                 out += "END";
