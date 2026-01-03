@@ -14,7 +14,7 @@ void Lexer::compute_line_col_at(std::string_view code, usize pos, int &line, int
     line = 0;
     col = 0;
     for (usize i = 0; i < pos; ++i) {
-        if (is_newline(code[i])) {
+        if (is_eos(code[i])) {
             ++line;
             col = 0;
         } else {
@@ -101,7 +101,7 @@ std::vector<Token> Lexer::tokenize_range(usize left, usize right) const {
             break;
         }
 
-        while (pos < right && is_hspace(code_[pos])) {
+        while (pos < right && is_whitespace(code_[pos])) {
             new_char();
         }
         if (pos >= right) {
@@ -109,8 +109,8 @@ std::vector<Token> Lexer::tokenize_range(usize left, usize right) const {
             break;
         }
 
-        if (is_newline(code_[pos])) {
-            out.emplace_back(TokenKind::Newline, code_.substr(pos, 1), line, col);
+        if (is_eos(code_[pos])) {
+            out.emplace_back(TokenKind::Eos, code_.substr(pos, 1), line, col);
             new_line();
             continue;
         }
@@ -168,6 +168,22 @@ std::vector<Token> Lexer::tokenize_range(usize left, usize right) const {
             continue;
         case ')':
             emit(TokenKind::RParen, start, 1, tok_line, tok_col);
+            new_char();
+            continue;
+        case '{':
+            emit(TokenKind::LBrace, start, 1, tok_line, tok_col);
+            new_char();
+            continue;
+        case '}':
+            emit(TokenKind::RBrace, start, 1, tok_line, tok_col);
+            new_char();
+            continue;
+        case '[':
+            emit(TokenKind::LBracket, start, 1, tok_line, tok_col);
+            new_char();
+            continue;
+        case ']':
+            emit(TokenKind::RBracket, start, 1, tok_line, tok_col);
             new_char();
             continue;
         case ',':

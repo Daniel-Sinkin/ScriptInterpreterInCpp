@@ -31,8 +31,8 @@ const Token &Parser::advance() {
     return previous();
 }
 
-void Parser::skip_newlines() {
-    while (match(TokenKind::Newline)) {
+void Parser::skip_eos() {
+    while (match(TokenKind::Eos)) {
     }
 }
 
@@ -269,7 +269,7 @@ std::unique_ptr<Expression> Parser::nud(const Token &t) {
 }
 
 Statement Parser::parse_statement() {
-    skip_newlines();
+    skip_eos();
     if (at_end()) {
         throw std::runtime_error("Trying to parse statement at the end");
     }
@@ -296,7 +296,7 @@ std::vector<Statement> Parser::parse_scope()
 {
     std::vector<Statement> statements;
     while (true) {
-        skip_newlines();
+        skip_eos();
         const TokenKind k = peek().kind;
         if (k == TokenKind::KWEnd || k == TokenKind::KWElse || k == TokenKind::Eof) {
             break;
@@ -314,7 +314,7 @@ LetStatement Parser::parse_let_statement() {
 
     auto rhs = parse_expr_bp(0);
 
-    while (match(TokenKind::Newline)) {
+    while (match(TokenKind::Eos)) {
     }
     return LetStatement{.identifier = std::string(id.lexeme), .expr = std::move(rhs)};
 }
@@ -322,7 +322,7 @@ LetStatement Parser::parse_let_statement() {
 PrintStatement Parser::parse_print_statement() {
     (void)consume(TokenKind::KWPrint, "Expected 'PRINT' at start of assignment statement");
     auto rhs = parse_expr_bp(0);
-    while (match(TokenKind::Newline)) {
+    while (match(TokenKind::Eos)) {
     }
     return PrintStatement{.expr = std::move(rhs)};
 }
@@ -330,7 +330,7 @@ PrintStatement Parser::parse_print_statement() {
 ReturnStatement Parser::parse_return_statement() {
     (void)consume(TokenKind::KWReturn, "Expected 'RETURN' at start of assignment statement");
     auto rhs = parse_expr_bp(0);
-    while (match(TokenKind::Newline)) {
+    while (match(TokenKind::Eos)) {
     }
     return ReturnStatement{.expr = std::move(rhs)};
 }
@@ -341,7 +341,7 @@ IfStatement Parser::parse_if_statement() {
     std::vector<Statement> then_scope = parse_scope();
     std::vector<Statement> else_scope{};
     if (match(TokenKind::KWElse)) {
-        skip_newlines();
+        skip_eos();
         else_scope = parse_scope();
     }
     (void)consume(TokenKind::KWEnd, "Expected 'END' after if statement");

@@ -31,20 +31,20 @@ static void expect_token(
 }
 
 static void test_basic_two_lines() {
-    const std::string code = "LET x = 1\nPRINT x";
+    const std::string code = "LET x = 1;PRINT x";
     const auto tokens = lex(code);
 
     EXPECT_TRUE(!tokens.empty());
     EXPECT_EQ(tokens.back().kind, TokenKind::Eof);
 
-    // LET, x, =, 1, \n, PRINT, x, EOF
+    // LET, x, =, 1, ;, PRINT, x, EOF
     EXPECT_EQ(tokens.size(), static_cast<std::size_t>(8));
 
     expect_token(tokens[0], TokenKind::KWLet, "LET", 0, 0);
     expect_token(tokens[1], TokenKind::Identifier, "x", 0, 4);
     expect_token(tokens[2], TokenKind::OpAssign, "=", 0, 6);
     expect_token(tokens[3], TokenKind::Integer, "1", 0, 8);
-    expect_token(tokens[4], TokenKind::Newline, "\n", 0, 9);
+    expect_token(tokens[4], TokenKind::Eos, ";", 0, 9);
     expect_token(tokens[5], TokenKind::KWPrint, "PRINT", 1, 0);
     expect_token(tokens[6], TokenKind::Identifier, "x", 1, 6);
 
@@ -54,19 +54,19 @@ static void test_basic_two_lines() {
 }
 
 static void test_hspace_skipping() {
-    const std::string code = "LET\t  x\t=\t  42\nPRINT\t\tx";
+    const std::string code = "LET\t  x\t=\t  42;PRINT\t\tx";
     const auto tokens = lex(code);
 
     EXPECT_TRUE(!tokens.empty());
     EXPECT_EQ(tokens.back().kind, TokenKind::Eof);
 
-    // LET, x, =, 42, \n, PRINT, x, EOF
+    // LET, x, =, 42, ;, PRINT, x, EOF
     EXPECT_EQ(tokens.size(), static_cast<std::size_t>(8));
     EXPECT_EQ(tokens[0].kind, TokenKind::KWLet);
     EXPECT_EQ(tokens[1].kind, TokenKind::Identifier);
     EXPECT_EQ(tokens[2].kind, TokenKind::OpAssign);
     EXPECT_EQ(tokens[3].kind, TokenKind::Integer);
-    EXPECT_EQ(tokens[4].kind, TokenKind::Newline);
+    EXPECT_EQ(tokens[4].kind, TokenKind::Eos);
     EXPECT_EQ(tokens[5].kind, TokenKind::KWPrint);
     EXPECT_EQ(tokens[6].kind, TokenKind::Identifier);
     EXPECT_EQ(tokens[7].kind, TokenKind::Eof);
@@ -75,13 +75,13 @@ static void test_hspace_skipping() {
     EXPECT_EQ(tokens[1].lexeme, "x");
     EXPECT_EQ(tokens[2].lexeme, "=");
     EXPECT_EQ(tokens[3].lexeme, "42");
-    EXPECT_EQ(tokens[4].lexeme, "\n");
+    EXPECT_EQ(tokens[4].lexeme, ";");
     EXPECT_EQ(tokens[5].lexeme, "PRINT");
     EXPECT_EQ(tokens[6].lexeme, "x");
 }
 
 static void test_multiple_blank_lines() {
-    const std::string code = "LET x = 1\n\n\nPRINT x\n";
+    const std::string code = "LET x = 1;;;PRINT x;";
     const auto tokens = lex(code);
 
     EXPECT_TRUE(!tokens.empty());
@@ -97,12 +97,12 @@ static void test_multiple_blank_lines() {
         TokenKind::Identifier,
         TokenKind::OpAssign,
         TokenKind::Integer,
-        TokenKind::Newline,
-        TokenKind::Newline,
-        TokenKind::Newline,
+        TokenKind::Eos,
+        TokenKind::Eos,
+        TokenKind::Eos,
         TokenKind::KWPrint,
         TokenKind::Identifier,
-        TokenKind::Newline,
+        TokenKind::Eos,
         TokenKind::Eof};
     EXPECT_EQ(kinds.size(), expected.size());
     for (std::size_t i = 0; i < expected.size(); ++i) {
@@ -113,15 +113,15 @@ static void test_multiple_blank_lines() {
 static void test_invalid_digit_throws() {
     // With the new lexer, "12a" is tokenized as Integer("12") then Identifier("a"),
     // so lexing itself should not throw.
-    EXPECT_NO_THROW(lex("LET x = 12a\n"));
+    EXPECT_NO_THROW(lex("LET x = 12a;"));
 }
 
 static void test_starts_with_zero_throws() {
-    EXPECT_THROW(lex("LET x = 01\n"));
+    EXPECT_THROW(lex("LET x = 01;"));
 }
 
 static void test_overflow_throws() {
-    EXPECT_THROW(lex("LET x = 999999999999999999999999999999999999\n"));
+    EXPECT_THROW(lex("LET x = 999999999999999999999999999999999999;"));
 }
 
 static void test_eof_only_once_and_at_end() {
@@ -136,9 +136,9 @@ static void test_eof_only_once_and_at_end() {
 }
 
 static void test_tokenize_range_absolute_line_col() {
-    const std::string code = "LET x = 1\nPRINT x";
+    const std::string code = "LET x = 1;PRINT x";
 
-    // indices: newline at 9, 'P' at 10
+    // indices: ';' at 9, 'P' at 10
     const auto tokens = lex_range(code, 10, code.size());
 
     EXPECT_TRUE(!tokens.empty());
@@ -155,7 +155,7 @@ static void test_tokenize_range_absolute_line_col() {
 }
 
 static void test_two_char_operators() {
-    const std::string code = "LET x = 1\nLET y = x == 1 && x != 2 || x <= 3 && x >= 4\n";
+    const std::string code = "LET x = 1;LET y = x == 1 && x != 2 || x <= 3 && x >= 4;";
     const auto tokens = lex(code);
 
     // Just sanity-check presence/order of a few key operator tokens.

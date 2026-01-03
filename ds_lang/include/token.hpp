@@ -22,6 +22,10 @@ enum class TokenKind {
 
     LParen,     // (
     RParen,     // )
+    LBrace,     // {
+    RBrace,     // }
+    LBracket,     // [
+    RBracket,     // ]
     Comma,      // ,
 
     OpAssign,   // =
@@ -40,7 +44,7 @@ enum class TokenKind {
     OpOrOr,     // ||
     OpBang,     // !
 
-    Newline,    // end of statement
+    Eos,    // end of statement
     Eof         // end of input
 };
 
@@ -83,6 +87,14 @@ constexpr std::string_view to_string(TokenKind k) noexcept {
         return "LParen";
     case TokenKind::RParen:
         return "RParen";
+    case TokenKind::LBrace:
+        return "LBrace";
+    case TokenKind::RBrace:
+        return "RBrace";
+    case TokenKind::LBracket:
+        return "LBracket";
+    case TokenKind::RBracket:
+        return "RBracket";
     case TokenKind::Comma:
         return "Comma";
 
@@ -117,8 +129,8 @@ constexpr std::string_view to_string(TokenKind k) noexcept {
     case TokenKind::OpBang:
         return "OpBang";
 
-    case TokenKind::Newline:
-        return "Newline";
+    case TokenKind::Eos:
+        return "Eos";
     case TokenKind::Eof:
         return "Eof";
     }
@@ -191,8 +203,8 @@ constexpr std::string_view explain(TokenKind k) noexcept {
     case TokenKind::OpBang:
         return "Logical NOT operator “!”.";
 
-    case TokenKind::Newline:
-        return "Newline token that terminates a statement.";
+    case TokenKind::Eos:
+        return "';' token that terminates a statement.";
     case TokenKind::Eof:
         return "End-of-file marker indicating no more input.";
     }

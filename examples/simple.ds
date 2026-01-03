@@ -1,13 +1,13 @@
-LET x = 10
-LET z = 0
-PRINT z
-WHILE x > 5 DO
-    LET x = x - 1
-    LET y = 12
-    WHILE y > 0 DO
-        LET y = y - 1
-        LET z = z + 1
-        PRINT z
-    END
-END
-RETURN z
+LET x = 10;
+LET z = 0;
+PRINT z;
+WHILE x > 5 DO;
+    LET x = x - 1;
+    LET y = 12;
+    WHILE y > 0 DO;
+        LET y = y - 1;
+        LET z = z + 1;
+        PRINT z;
+    END;
+END;
+RETURN z;

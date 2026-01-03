@@ -151,7 +151,7 @@ private:
     [[nodiscard]] bool match(TokenKind k);
     [[nodiscard]] const Token &consume(TokenKind kind, std::string_view msg);
 
-    void skip_newlines();
+    void skip_eos();
 
     [[nodiscard]] std::unique_ptr<Expression> parse_expr_bp(int min_bp);
     [[nodiscard]] std::unique_ptr<Expression> nud(const Token &t);
@@ -168,7 +168,7 @@ private:
 
     static bool is_expr_terminator(TokenKind k) noexcept {
         switch (k) {
-        case TokenKind::Newline:
+        case TokenKind::Eos:
         case TokenKind::Eof:
         case TokenKind::RParen:
         case TokenKind::Comma:
