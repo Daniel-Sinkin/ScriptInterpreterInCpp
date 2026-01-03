@@ -24,26 +24,18 @@ void Lexer::compute_line_col_at(std::string_view code, usize pos, int &line, int
 }
 
 static TokenKind keyword_or_identifier(std::string_view s) {
-    if (s == "LET")
-        return TokenKind::KWLet;
-    if (s == "PRINT")
-        return TokenKind::KWPrint;
-    if (s == "FUNC")
-        return TokenKind::KWFunc;
-    if (s == "RETURN")
-        return TokenKind::KWReturn;
-    if (s == "IF")
-        return TokenKind::KWIf;
-    if (s == "THEN")
-        return TokenKind::KWThen;
-    if (s == "ELSE")
-        return TokenKind::KWElse;
-    if (s == "WHILE")
-        return TokenKind::KWWhile;
-    if (s == "DO")
-        return TokenKind::KWDo;
-    if (s == "END")
-        return TokenKind::KWEnd;
+    // clang-format off
+    if (s == "LET")    return TokenKind::KWLet;
+    if (s == "PRINT")  return TokenKind::KWPrint;
+    if (s == "FUNC")   return TokenKind::KWFunc;
+    if (s == "RETURN") return TokenKind::KWReturn;
+    if (s == "IF")     return TokenKind::KWIf;
+    if (s == "THEN")   return TokenKind::KWThen;
+    if (s == "ELSE")   return TokenKind::KWElse;
+    if (s == "WHILE")  return TokenKind::KWWhile;
+    if (s == "DO")     return TokenKind::KWDo;
+    if (s == "END")    return TokenKind::KWEnd;
+    // clang-format on
     return TokenKind::Identifier;
 }
 
@@ -52,7 +44,6 @@ TokenKind Lexer::determine_token_kind(std::string_view lexeme, int line, int col
         throw std::runtime_error("Cannot build token out of empty lexeme");
     }
 
-    // Integer literal (no sign here; '-' is an operator token)
     if (char_is_digit(lexeme[0])) {
         auto res = string_to_i64(lexeme);
         if (!res) {
@@ -64,7 +55,6 @@ TokenKind Lexer::determine_token_kind(std::string_view lexeme, int line, int col
         return TokenKind::Integer;
     }
 
-    // Identifier / keyword
     if (!is_valid_identifier(lexeme)) {
         throw std::runtime_error(std::format(
             "The lexeme {} is not a valid identifier! (line={},column={})",
@@ -111,7 +101,6 @@ std::vector<Token> Lexer::tokenize_range(usize left, usize right) const {
             break;
         }
 
-        // skip horizontal whitespace
         while (pos < right && is_hspace(code_[pos])) {
             new_char();
         }
@@ -120,7 +109,6 @@ std::vector<Token> Lexer::tokenize_range(usize left, usize right) const {
             break;
         }
 
-        // newline token
         if (is_newline(code_[pos])) {
             out.emplace_back(TokenKind::Newline, code_.substr(pos, 1), line, col);
             new_line();
@@ -131,7 +119,6 @@ std::vector<Token> Lexer::tokenize_range(usize left, usize right) const {
         const int tok_line = line;
         const int tok_col = col;
 
-        // ----- multi-char operators (must check before single-char) -----
         if (pos + 1 < right) {
             const char a = code_[pos];
             const char b = code_[pos + 1];
@@ -174,7 +161,6 @@ std::vector<Token> Lexer::tokenize_range(usize left, usize right) const {
             }
         }
 
-        // ----- single-char punctuation/operators -----
         switch (code_[pos]) {
         case '(':
             emit(TokenKind::LParen, start, 1, tok_line, tok_col);
@@ -231,7 +217,6 @@ std::vector<Token> Lexer::tokenize_range(usize left, usize right) const {
             break;
         }
 
-        // ----- integer literal -----
         if (char_is_digit(code_[pos])) {
             while (pos < right && char_is_digit(code_[pos])) {
                 new_char();
@@ -239,12 +224,11 @@ std::vector<Token> Lexer::tokenize_range(usize left, usize right) const {
             const std::string_view lex = code_.substr(start, pos - start);
             emit(TokenKind::Integer, start, pos - start, tok_line, tok_col);
 
-            // validate by calling determine_token_kind (keeps your error handling consistent)
+            // Validation
             (void)determine_token_kind(lex, tok_line, tok_col);
             continue;
         }
 
-        // ----- identifier / keyword -----
         if (char_is_valid_for_identifier(code_[pos])) {
             new_char();
             while (pos < right && (char_is_valid_for_identifier(code_[pos]) || char_is_digit(code_[pos]))) {
@@ -252,7 +236,6 @@ std::vector<Token> Lexer::tokenize_range(usize left, usize right) const {
             }
             const std::string_view lex = code_.substr(start, pos - start);
 
-            // validate identifier and map keywords
             if (!is_valid_identifier(lex)) {
                 throw std::runtime_error(std::format(
                     "Invalid identifier {} (line={},column={})",
@@ -263,7 +246,6 @@ std::vector<Token> Lexer::tokenize_range(usize left, usize right) const {
             continue;
         }
 
-        // Unknown character
         throw std::runtime_error(std::format(
             "Unexpected character {:?} (line={},column={})",
             code_.substr(pos, 1), tok_line, tok_col));

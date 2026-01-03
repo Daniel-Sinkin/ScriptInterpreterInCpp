@@ -9,19 +9,22 @@
 
 namespace ds_lang {
 enum class BinaryOp {
-    Add,
-    Sub,
-    Mul,
-    Div,
-    Mod,
-    Eq,
-    Neq,
-    Lt,
-    Le,
-    Gt,
-    Ge,
-    And,
-    Or,
+    Add, // +
+    Sub, // -
+    Mul, // *
+    Div, // /
+    Mod, // %
+
+    Eq,  // ==
+    Neq, // !=
+
+    Lt, // <
+    Le, // <=
+    Gt, // >
+    Ge, // >=
+
+    And, // &&
+    Or,  // ||
 };
 
 struct Expression;
