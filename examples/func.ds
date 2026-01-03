@@ -1,0 +1,4 @@
+FUNC myfunc()
+    return 1
+END
+return myfunc()
