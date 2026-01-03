@@ -1,0 +1,2 @@
+HeaderFilterRegex: 'ds_lang/.*'
+SystemHeaders: false
