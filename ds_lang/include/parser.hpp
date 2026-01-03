@@ -1,12 +1,13 @@
 // ds_lang/include/parser.hpp
 #pragma once
 
-#include <memory>
 #include <string>
 #include <string_view>
 #include <variant>
 #include <vector>
+#include <memory>
 
+#include "formatters.hpp" // IWYU pragma: keep
 #include "token.hpp"
 #include "types.hpp"
 

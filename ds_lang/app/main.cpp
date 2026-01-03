@@ -1,4 +1,5 @@
 // ds_lang/app/main.cpp
+#include <print>
 #include <string>
 #include <vector>
 
@@ -17,6 +18,10 @@ int main() {
     std::vector<Token> tokens = lexer.tokenize_all();
     Parser parser{tokens};
 
-    Interpreter interpreter{false};
-    interpreter.process_scope(parser.parse_scope());
+    for (const auto &statement : parser.parse_scope()) {
+        std::println("{}", statement);
+    }
+
+    // Interpreter interpreter{false};
+    // interpreter.process_scope(parser.parse_scope());
 }
