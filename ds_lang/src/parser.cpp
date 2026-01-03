@@ -2,7 +2,6 @@
 #include <algorithm>
 #include <format>
 #include <memory>
-#include <ranges>
 #include <stdexcept>
 #include <string_view>
 #include <utility>
@@ -241,7 +240,7 @@ std::unique_ptr<Expression> Parser::nud(const Token &t) {
     }
 }
 
-Staement Parser::parse_statement() {
+Statement Parser::parse_statement() {
     skip_newlines();
     if (at_end()) {
         throw std::runtime_error("Trying to parse statement at the end");
@@ -263,6 +262,20 @@ Staement Parser::parse_statement() {
         error_here("Peeked TokenKind can't be a start of a statement scope");
     }
     std::unreachable();
+}
+
+std::vector<Statement> Parser::parse_scope()
+{
+    std::vector<Statement> statements;
+    while (true) {
+        skip_newlines();
+        const TokenKind k = peek().kind;
+        if (k == TokenKind::KWEnd || k == TokenKind::KWElse || k == TokenKind::Eof) {
+            break;
+        }
+        statements.push_back(parse_statement());
+    }
+    return statements;
 }
 
 LetStatement Parser::parse_let_statement() {
@@ -313,12 +326,11 @@ WhileStatement Parser::parse_while_statement() {
     (void)consume(TokenKind::KWWhile, "Expected 'WHILE' at start of assignment statement");
     auto while_expr = parse_expr_bp(0);
     (void)consume(TokenKind::KWDo, "Expected 'DO' after 'WHILE' expression");
-    // Need a variable SCOPE not a single statement, a scope would be a std::vector of statements
-    std::unique_ptr<Statement> do_ptr = std::make_unique<Statement>(parse_statement());
+    std::vector<Statement> do_scope = parse_scope();
     (void)consume(TokenKind::KWEnd, "Expected 'END' after while do statement");
     return WhileStatement{
         .while_expr = std::move(while_expr),
-        .do_statement = std::move(do_ptr)};
+        .do_scope = std::move(do_scope)};
 }
 FunctionStatement Parser::parse_func_statement() {
     (void)consume(TokenKind::KWFunc, "Expected 'FUNC' at start of assignment statement");

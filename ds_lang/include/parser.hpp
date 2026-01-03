@@ -91,8 +91,7 @@ struct IfStatement {
 
 struct WhileStatement {
     std::unique_ptr<Expression> while_expr;
-    // Need a variable SCOPE not a single statement, a scope would be a std::vector of statements
-    std::unique_ptr<Statement> do_statement;
+    std::vector<Statement> do_scope;
 };
 
 struct FunctionStatement {
@@ -122,6 +121,7 @@ public:
     Parser &operator=(const Parser &) = delete;
 
     [[nodiscard]] Statement parse_statement();
+    [[nodiscard]] std::vector<Statement> parse_scope(); // Parse statements until you see an END or EOF
     [[nodiscard]] LetStatement parse_let_statement();
     [[nodiscard]] PrintStatement parse_print_statement();
     [[nodiscard]] ReturnStatement parse_return_statement();
