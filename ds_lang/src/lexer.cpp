@@ -25,16 +25,13 @@ void Lexer::compute_line_col_at(std::string_view code, usize pos, int &line, int
 
 static TokenKind keyword_or_identifier(std::string_view s) {
     // clang-format off
-    if (s == "LET")    return TokenKind::KWLet;
-    if (s == "PRINT")  return TokenKind::KWPrint;
-    if (s == "FUNC")   return TokenKind::KWFunc;
-    if (s == "RETURN") return TokenKind::KWReturn;
-    if (s == "IF")     return TokenKind::KWIf;
-    if (s == "THEN")   return TokenKind::KWThen;
-    if (s == "ELSE")   return TokenKind::KWElse;
-    if (s == "WHILE")  return TokenKind::KWWhile;
-    if (s == "DO")     return TokenKind::KWDo;
-    if (s == "END")    return TokenKind::KWEnd;
+    if (s == "int")    return TokenKind::KWInt;
+    if (s == "print")  return TokenKind::KWPrint;
+    if (s == "func")   return TokenKind::KWFunc;
+    if (s == "return") return TokenKind::KWReturn;
+    if (s == "if")     return TokenKind::KWIf;
+    if (s == "else")   return TokenKind::KWElse;
+    if (s == "while")  return TokenKind::KWWhile;
     // clang-format on
     return TokenKind::Identifier;
 }

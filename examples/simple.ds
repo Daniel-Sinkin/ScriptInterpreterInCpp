@@ -1,7 +1,0 @@
-{
-    FUNC main()
-    {
-        LET x = 1;
-        RETURN 0;
-    }
-}

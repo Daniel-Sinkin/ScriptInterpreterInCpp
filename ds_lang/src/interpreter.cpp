@@ -183,7 +183,7 @@ i64 Interpreter::evaluate_expression(const Expression &expr) {
 Interpreter::ExecResult Interpreter::process_statement(Statement &statement) {
     return std::visit(
         overloaded{
-            [&](LetStatement &s) -> ExecResult {
+            [&](IntAssignmentStatement &s) -> ExecResult {
                 assert(s.expr);
                 vars_.insert_or_assign(s.identifier, evaluate_expression(*s.expr));
                 return ExecResult::Continue;
@@ -201,6 +201,10 @@ Interpreter::ExecResult Interpreter::process_statement(Statement &statement) {
                 assert(s.expr);
                 return_value_ = evaluate_expression(*s.expr);
                 return ExecResult::Return;
+            },
+            [&](ScopeStatement &s) -> ExecResult {
+                process_scope(s.scope);
+                return ExecResult::Continue;
             },
             [&](IfStatement &s) -> ExecResult {
                 assert(s.if_expr);

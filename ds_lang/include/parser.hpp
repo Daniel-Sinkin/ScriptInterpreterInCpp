@@ -76,7 +76,7 @@ struct Expression {
 
 struct Statement;
 
-struct LetStatement {
+struct IntAssignmentStatement {
     std::string identifier;
     std::unique_ptr<Expression> expr;
 };
@@ -87,6 +87,10 @@ struct PrintStatement {
 
 struct ReturnStatement {
     std::unique_ptr<Expression> expr;
+};
+
+struct ScopeStatement {
+    std::vector<Statement> scope;
 };
 
 struct IfStatement {
@@ -108,12 +112,13 @@ struct FunctionStatement {
 
 struct Statement {
     using Variant = std::variant<
-        LetStatement,
+        IntAssignmentStatement,
         PrintStatement,
         ReturnStatement,
         IfStatement,
         WhileStatement,
-        FunctionStatement>;
+        FunctionStatement,
+        ScopeStatement>;
     Variant node;
 };
 
@@ -132,9 +137,10 @@ public:
     [[nodiscard]] Statement parse_statement();
     [[nodiscard]] std::vector<Statement> parse_scope(); // Parse statements until you see an END or EOF
     [[nodiscard]] std::vector<Statement> parse_program(); // Parse statements until you see an END or EOF
-    [[nodiscard]] LetStatement parse_let_statement();
+    [[nodiscard]] IntAssignmentStatement parse_let_statement();
     [[nodiscard]] PrintStatement parse_print_statement();
     [[nodiscard]] ReturnStatement parse_return_statement();
+    [[nodiscard]] ScopeStatement parse_scope_statement();
     [[nodiscard]] IfStatement parse_if_statement();
     [[nodiscard]] WhileStatement parse_while_statement();
     [[nodiscard]] FunctionStatement parse_func_statement();
@@ -173,10 +179,7 @@ private:
         case TokenKind::Eof:
         case TokenKind::RParen:
         case TokenKind::Comma:
-        case TokenKind::KWThen:
-        case TokenKind::KWDo:
         case TokenKind::KWElse:
-        case TokenKind::KWEnd:
             return true;
         default:
             return false;

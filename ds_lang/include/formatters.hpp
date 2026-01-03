@@ -5,8 +5,6 @@
 #include <string>
 #include <string_view>
 
-// Forward declarations: the full definitions must be visible
-// before you use ds_lang::Fmt::format_* implementations.
 namespace ds_lang {
 struct Expression;
 struct Statement;
