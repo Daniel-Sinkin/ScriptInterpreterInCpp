@@ -156,9 +156,9 @@ static void format_statement_into(std::string& out, const Statement& s, int inde
                 out += st.expr ? format_expression(*st.expr) : "<null-expr>";
             },
             [&](const IfStatement& st) {
-                out += "IF ";
+                out += "IF (";
                 out += st.if_expr ? format_expression(*st.if_expr) : "<null-expr>";
-                out += " THEN\n";
+                out += ") {\n";
 
                 if (!st.then_scope.empty()) {
                     format_scope_into(out, st.then_scope, indent + 4);
@@ -173,7 +173,7 @@ static void format_statement_into(std::string& out, const Statement& s, int inde
                 }
 
                 append_indent(out, indent);
-                out += "END";
+                out += "}";
             },
             [&](const WhileStatement& st) {
                 out += "WHILE ";
