@@ -26,7 +26,7 @@ std::string load_code(const std::string &path);
 constexpr bool is_whitespace(char c) noexcept
 {
     return c == ' ' || c == '\t' || c == '\r' ||
-           c == '\f' || c == '\v' || c == '\n';
+           c == '\f' || c == '\v';
 }
 constexpr bool is_eos(char c) noexcept {
     return c == ';';

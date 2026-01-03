@@ -297,6 +297,12 @@ Statement Parser::parse_statement() {
 
 std::vector<Statement> Parser::parse_program() {
     std::vector<Statement> statements;
+
+    skip_eos();
+    while (peek().kind != TokenKind::Eof) {
+        statements.push_back(parse_statement());
+        skip_eos();
+    }
     return statements;
 }
 

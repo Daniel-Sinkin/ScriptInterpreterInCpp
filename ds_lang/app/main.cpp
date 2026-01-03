@@ -28,8 +28,8 @@ int main() {
     std::println();
     std::println("Reproduced source code out of parsed expressions:");
     std::println();
-    auto statements = parser.parse_scope();
-    for(const auto& statement : statements) {
+    auto statements = parser.parse_program();
+    for (const auto& statement : statements) {
         std::println("{}", statement);
     }
 

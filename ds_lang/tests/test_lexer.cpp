@@ -10,6 +10,7 @@
 #include "token.hpp"
 
 namespace ds_lang::Test {
+
 static std::vector<Token> lex(std::string_view code) {
     return ds_lang::Lexer{code}.tokenize_all();
 }
@@ -31,13 +32,13 @@ static void expect_token(
 }
 
 static void test_basic_two_lines() {
-    const std::string code = "let x = 1;print x";
+    const std::string code = "int x = 1;print x";
     const auto tokens = lex(code);
 
     EXPECT_TRUE(!tokens.empty());
     EXPECT_EQ(tokens.back().kind, TokenKind::Eof);
 
-    // let, x, =, 1, ;, print, x, EOF
+    // int, x, =, 1, ;, print, x, EOF
     EXPECT_EQ(tokens.size(), static_cast<std::size_t>(8));
 
     expect_token(tokens[0], TokenKind::KWInt, "int", 0, 0);
@@ -45,23 +46,24 @@ static void test_basic_two_lines() {
     expect_token(tokens[2], TokenKind::OpAssign, "=", 0, 6);
     expect_token(tokens[3], TokenKind::Integer, "1", 0, 8);
     expect_token(tokens[4], TokenKind::Eos, ";", 0, 9);
-    expect_token(tokens[5], TokenKind::KWPrint, "print", 1, 0);
-    expect_token(tokens[6], TokenKind::Identifier, "x", 1, 6);
+    expect_token(tokens[5], TokenKind::KWPrint, "print", 0, 10);
+    expect_token(tokens[6], TokenKind::Identifier, "x", 0, 16);
 
     EXPECT_EQ(tokens[7].kind, TokenKind::Eof);
-    EXPECT_EQ(tokens[7].line, 1);
-    EXPECT_EQ(tokens[7].column, 7);
+    EXPECT_EQ(tokens[7].line, 0);
+    EXPECT_EQ(tokens[7].column, 17);
 }
 
 static void test_hspace_skipping() {
-    const std::string code = "let\t  x\t=\t  42;print\t\tx";
+    const std::string code = "int\t  x\t=\t  42;print\t\tx";
     const auto tokens = lex(code);
 
     EXPECT_TRUE(!tokens.empty());
     EXPECT_EQ(tokens.back().kind, TokenKind::Eof);
 
-    // let, x, =, 42, ;, print, x, EOF
+    // int, x, =, 42, ;, print, x, EOF
     EXPECT_EQ(tokens.size(), static_cast<std::size_t>(8));
+
     EXPECT_EQ(tokens[0].kind, TokenKind::KWInt);
     EXPECT_EQ(tokens[1].kind, TokenKind::Identifier);
     EXPECT_EQ(tokens[2].kind, TokenKind::OpAssign);
@@ -81,7 +83,7 @@ static void test_hspace_skipping() {
 }
 
 static void test_multiple_blank_lines() {
-    const std::string code = "let x = 1;;;print x;";
+    const std::string code = "int x = 1;;;print x;";
     const auto tokens = lex(code);
 
     EXPECT_TRUE(!tokens.empty());
@@ -89,8 +91,9 @@ static void test_multiple_blank_lines() {
 
     std::vector<TokenKind> kinds;
     kinds.reserve(tokens.size());
-    for (const auto &t : tokens)
+    for (const auto &t : tokens) {
         kinds.push_back(t.kind);
+    }
 
     const std::vector<TokenKind> expected = {
         TokenKind::KWInt,
@@ -103,7 +106,9 @@ static void test_multiple_blank_lines() {
         TokenKind::KWPrint,
         TokenKind::Identifier,
         TokenKind::Eos,
-        TokenKind::Eof};
+        TokenKind::Eof,
+    };
+
     EXPECT_EQ(kinds.size(), expected.size());
     for (std::size_t i = 0; i < expected.size(); ++i) {
         EXPECT_EQ(kinds[i], expected[i]);
@@ -111,34 +116,39 @@ static void test_multiple_blank_lines() {
 }
 
 static void test_invalid_digit_throws() {
-    // With the new lexer, "12a" is tokenized as Integer("12") then Identifier("a"),
-    // so lexing itself should not throw.
-    EXPECT_NO_THROW(lex("let x = 12a;"));
+    // With the current lexer rules, a numeric token is a run of digits.
+    // If an unexpected character follows (e.g. '$'), lexing must fail there.
+    EXPECT_THROW(lex("int x = 12$;"));
 }
 
 static void test_starts_with_zero_throws() {
-    EXPECT_THROW(lex("let x = 01;"));
+    EXPECT_THROW(lex("int x = 01;"));
 }
 
 static void test_overflow_throws() {
-    EXPECT_THROW(lex("let x = 999999999999999999999999999999999999;"));
+    EXPECT_THROW(lex("int x = 999999999999999999999999999999999999;"));
 }
 
 static void test_eof_only_once_and_at_end() {
     const auto tokens = lex("print x");
     int eof_count = 0;
     for (const auto &t : tokens) {
-        if (t.kind == TokenKind::Eof)
+        if (t.kind == TokenKind::Eof) {
             ++eof_count;
+        }
     }
     EXPECT_EQ(eof_count, 1);
     EXPECT_EQ(tokens.back().kind, TokenKind::Eof);
 }
 
-static void test_tokenize_range_absolute_line_col() {
-    const std::string code = "let x = 1;print x";
+// ----------------------------------------------------------------------------
+// Extra lexer coverage (not referenced by your current CMake LEXER_TEST_CASES)
+// ----------------------------------------------------------------------------
 
-    // indices: ';' at 9, 'P' at 10
+static void test_tokenize_range_absolute_line_col() {
+    const std::string code = "int x = 1;print x";
+
+    // indices: ';' at 9, 'p' at 10
     const auto tokens = lex_range(code, 10, code.size());
 
     EXPECT_TRUE(!tokens.empty());
@@ -155,10 +165,12 @@ static void test_tokenize_range_absolute_line_col() {
 }
 
 static void test_two_char_operators() {
-    const std::string code = "let x = 1;let y = x == 1 && x != 2 || x <= 3 && x >= 4;";
+    const std::string code =
+        "int x = 1;"
+        "int y = x == 1 && x != 2 || x <= 3 && x >= 4;";
+
     const auto tokens = lex(code);
 
-    // Just sanity-check presence/order of a few key operator tokens.
     bool saw_eqeq = false;
     bool saw_neq = false;
     bool saw_andand = false;
@@ -167,18 +179,12 @@ static void test_two_char_operators() {
     bool saw_ge = false;
 
     for (const auto &t : tokens) {
-        if (t.kind == TokenKind::OpEqEq)
-            saw_eqeq = true;
-        if (t.kind == TokenKind::OpNeq)
-            saw_neq = true;
-        if (t.kind == TokenKind::OpAndAnd)
-            saw_andand = true;
-        if (t.kind == TokenKind::OpOrOr)
-            saw_oror = true;
-        if (t.kind == TokenKind::OpLe)
-            saw_le = true;
-        if (t.kind == TokenKind::OpGe)
-            saw_ge = true;
+        saw_eqeq |= (t.kind == TokenKind::OpEqEq);
+        saw_neq |= (t.kind == TokenKind::OpNeq);
+        saw_andand |= (t.kind == TokenKind::OpAndAnd);
+        saw_oror |= (t.kind == TokenKind::OpOrOr);
+        saw_le |= (t.kind == TokenKind::OpLe);
+        saw_ge |= (t.kind == TokenKind::OpGe);
     }
 
     EXPECT_TRUE(saw_eqeq);
@@ -187,6 +193,54 @@ static void test_two_char_operators() {
     EXPECT_TRUE(saw_oror);
     EXPECT_TRUE(saw_le);
     EXPECT_TRUE(saw_ge);
+}
+
+static void test_keyword_prefix_is_identifier() {
+    const auto tokens = lex("intx");
+    EXPECT_EQ(tokens.size(), static_cast<std::size_t>(2));
+    EXPECT_EQ(tokens[0].kind, TokenKind::Identifier);
+    EXPECT_EQ(tokens[0].lexeme, "intx");
+    EXPECT_EQ(tokens[1].kind, TokenKind::Eof);
+}
+
+static void test_delimiters_and_bang() {
+    const std::string code = "{ ( ) { } [ ] , ! }";
+    const auto tokens = lex(code);
+
+    const std::vector<TokenKind> expected = {
+        TokenKind::LBrace,
+        TokenKind::LParen,
+        TokenKind::RParen,
+        TokenKind::LBrace,
+        TokenKind::RBrace,
+        TokenKind::LBracket,
+        TokenKind::RBracket,
+        TokenKind::Comma,
+        TokenKind::OpBang,
+        TokenKind::RBrace,
+        TokenKind::Eof,
+    };
+
+    EXPECT_EQ(tokens.size(), expected.size());
+    for (std::size_t i = 0; i < expected.size(); ++i) {
+        EXPECT_EQ(tokens[i].kind, expected[i]);
+    }
+}
+
+static void test_single_ampersand_throws() {
+    // Only && is valid; a lone '&' is an unexpected character.
+    EXPECT_THROW(lex("print x & y;"));
+}
+
+static void test_single_pipe_throws() {
+    // Only || is valid; a lone '|' is an unexpected character.
+    EXPECT_THROW(lex("print x | y;"));
+}
+
+static void test_tokenize_range_invalid_throws() {
+    const std::string code = "print x";
+    EXPECT_THROW(lex_range(code, 4, 3));
+    EXPECT_THROW(lex_range(code, 0, code.size() + 1));
 }
 
 } // namespace ds_lang::Test
@@ -200,6 +254,7 @@ int main(int argc, char **argv) {
     };
 
     const TestCase tests[] = {
+        // Cases referenced from CMake (keep names stable)
         {"basic_two_lines", test_basic_two_lines},
         {"hspace_skipping", test_hspace_skipping},
         {"multiple_blank_lines", test_multiple_blank_lines},
@@ -207,8 +262,15 @@ int main(int argc, char **argv) {
         {"starts_with_zero_throws", test_starts_with_zero_throws},
         {"overflow_throws", test_overflow_throws},
         {"eof_only_once_and_at_end", test_eof_only_once_and_at_end},
+
+        // Extra cases (not in CMake's LEXER_TEST_CASES by default)
         {"tokenize_range_absolute_line_col", test_tokenize_range_absolute_line_col},
         {"two_char_operators", test_two_char_operators},
+        {"keyword_prefix_is_identifier", test_keyword_prefix_is_identifier},
+        {"delimiters_and_bang", test_delimiters_and_bang},
+        {"single_ampersand_throws", test_single_ampersand_throws},
+        {"single_pipe_throws", test_single_pipe_throws},
+        {"tokenize_range_invalid_throws", test_tokenize_range_invalid_throws},
     };
 
     std::string_view only;
@@ -223,8 +285,9 @@ int main(int argc, char **argv) {
     int ran = 0;
 
     for (const auto &t : tests) {
-        if (!only.empty() && only != t.name)
+        if (!only.empty() && only != t.name) {
             continue;
+        }
         ++ran;
         try {
             t.fn();

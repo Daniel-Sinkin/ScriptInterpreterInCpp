@@ -14,7 +14,7 @@ void Lexer::compute_line_col_at(std::string_view code, usize pos, int &line, int
     line = 0;
     col = 0;
     for (usize i = 0; i < pos; ++i) {
-        if (is_eos(code[i])) {
+        if (code[i] == '\n') {
             ++line;
             col = 0;
         } else {
@@ -78,11 +78,11 @@ std::vector<Token> Lexer::tokenize_range(usize left, usize right) const {
     usize pos = left;
     std::vector<Token> out;
 
-    auto new_char = [&] {
+    auto new_char = [&] -> void {
         ++pos;
         ++col;
     };
-    auto new_line = [&] {
+    auto new_line = [&] -> void {
         ++pos;
         ++line;
         col = 0;
@@ -98,8 +98,26 @@ std::vector<Token> Lexer::tokenize_range(usize left, usize right) const {
             break;
         }
 
-        while (pos < right && is_whitespace(code_[pos])) {
-            new_char();
+        while (pos < right) {
+            const char c = code_[pos];
+            if (c == '\n') {
+                new_line();
+                continue;
+            }
+            if (c == '\r') { // \r\n is windows specific newline shenanigans
+                if (pos + 1 < right && code_[pos + 1] == '\n') {
+                    ++pos;
+                    new_line();
+                } else {
+                    new_char();
+                }
+                continue;
+            }
+            if (is_whitespace(c)) {
+                new_char();
+                continue;
+            }
+            break;
         }
         if (pos >= right) {
             out.emplace_back(TokenKind::Eof, std::string_view{}, line, col);
@@ -108,7 +126,7 @@ std::vector<Token> Lexer::tokenize_range(usize left, usize right) const {
 
         if (is_eos(code_[pos])) {
             out.emplace_back(TokenKind::Eos, code_.substr(pos, 1), line, col);
-            new_line();
+            new_char();
             continue;
         }
 
