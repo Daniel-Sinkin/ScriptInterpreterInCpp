@@ -23,13 +23,13 @@ struct ScopeExit {
 
 std::string load_code(const std::string &path);
 
-constexpr bool is_hspace(char c) noexcept // hspace == horizontal whitespace
+constexpr bool is_whitespace(char c) noexcept
 {
     return c == ' ' || c == '\t' || c == '\r' ||
            c == '\f' || c == '\v';
 }
-constexpr bool is_newline(char c) noexcept {
-    return c == '\n';
+constexpr bool is_eos(char c) noexcept {
+    return c == ';';
 }
 
 constexpr bool char_is_digit(char c) noexcept { return c >= '0' && c <= '9'; }

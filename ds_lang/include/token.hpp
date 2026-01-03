@@ -9,19 +9,20 @@ enum class TokenKind {
     Identifier, // variable / function name
     Integer,    // integer literal
 
-    KWLet,      // LET
-    KWPrint,    // PRINT
-    KWFunc,     // FUNC
-    KWReturn,   // RETURN
-    KWIf,       // IF
-    KWThen,     // THEN
-    KWElse,     // ELSE
-    KWWhile,    // WHILE
-    KWDo,       // DO
-    KWEnd,      // END
+    KWInt,      // int
+    KWPrint,    // print
+    KWFunc,     // func
+    KWReturn,   // return
+    KWIf,       // if
+    KWElse,     // else
+    KWWhile,    // while
 
     LParen,     // (
     RParen,     // )
+    LBrace,     // {
+    RBrace,     // }
+    LBracket,   // [
+    RBracket,   // ]
     Comma,      // ,
 
     OpAssign,   // =
@@ -40,7 +41,7 @@ enum class TokenKind {
     OpOrOr,     // ||
     OpBang,     // !
 
-    Newline,    // end of statement
+    Eos,        // end of statement
     Eof         // end of input
 };
 
@@ -58,7 +59,7 @@ constexpr std::string_view to_string(TokenKind k) noexcept {
     case TokenKind::Integer:
         return "Integer";
 
-    case TokenKind::KWLet:
+    case TokenKind::KWInt:
         return "KWLet";
     case TokenKind::KWPrint:
         return "KWPrint";
@@ -68,21 +69,23 @@ constexpr std::string_view to_string(TokenKind k) noexcept {
         return "KWReturn";
     case TokenKind::KWIf:
         return "KWIf";
-    case TokenKind::KWThen:
-        return "KWThen";
     case TokenKind::KWElse:
         return "KWElse";
     case TokenKind::KWWhile:
         return "KWWhile";
-    case TokenKind::KWDo:
-        return "KWDo";
-    case TokenKind::KWEnd:
-        return "KWEnd";
 
     case TokenKind::LParen:
         return "LParen";
     case TokenKind::RParen:
         return "RParen";
+    case TokenKind::LBrace:
+        return "LBrace";
+    case TokenKind::RBrace:
+        return "RBrace";
+    case TokenKind::LBracket:
+        return "LBracket";
+    case TokenKind::RBracket:
+        return "RBracket";
     case TokenKind::Comma:
         return "Comma";
 
@@ -117,8 +120,8 @@ constexpr std::string_view to_string(TokenKind k) noexcept {
     case TokenKind::OpBang:
         return "OpBang";
 
-    case TokenKind::Newline:
-        return "Newline";
+    case TokenKind::Eos:
+        return "Eos";
     case TokenKind::Eof:
         return "Eof";
     }
@@ -132,7 +135,7 @@ constexpr std::string_view explain(TokenKind k) noexcept {
     case TokenKind::Integer:
         return "A base-10 integer literal.";
 
-    case TokenKind::KWLet:
+    case TokenKind::KWInt:
         return "Keyword introducing a variable definition or assignment.";
     case TokenKind::KWPrint:
         return "Keyword for printing a value to standard output.";
@@ -142,21 +145,23 @@ constexpr std::string_view explain(TokenKind k) noexcept {
         return "Keyword returning a value from a function.";
     case TokenKind::KWIf:
         return "Keyword starting a conditional expression or statement.";
-    case TokenKind::KWThen:
-        return "Keyword separating the condition from the then-branch.";
     case TokenKind::KWElse:
         return "Keyword introducing the else-branch.";
     case TokenKind::KWWhile:
         return "Keyword starting a while loop.";
-    case TokenKind::KWDo:
-        return "Keyword starting the body of a while loop.";
-    case TokenKind::KWEnd:
-        return "Keyword terminating a block (IF/WHILE/FUNC).";
 
     case TokenKind::LParen:
         return "Left parenthesis “(”.";
     case TokenKind::RParen:
         return "Right parenthesis “)”.";
+    case TokenKind::LBrace:
+        return "Left Brace “{”.";
+    case TokenKind::RBrace:
+        return "Left Brace “}”.";
+    case TokenKind::LBracket:
+        return "Left parenthesis “[”.";
+    case TokenKind::RBracket:
+        return "Right bracket “]”.";
     case TokenKind::Comma:
         return "Comma “,” separator.";
 
@@ -191,8 +196,8 @@ constexpr std::string_view explain(TokenKind k) noexcept {
     case TokenKind::OpBang:
         return "Logical NOT operator “!”.";
 
-    case TokenKind::Newline:
-        return "Newline token that terminates a statement.";
+    case TokenKind::Eos:
+        return "';' token that terminates a statement.";
     case TokenKind::Eof:
         return "End-of-file marker indicating no more input.";
     }

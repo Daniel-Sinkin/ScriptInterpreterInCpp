@@ -9,55 +9,76 @@
 
 #include "parser.hpp"
 #include "util.hpp"
+#include "vm.hpp"
 
 namespace ds_lang::Fmt {
 
 static std::string_view to_string(BinaryOp op) noexcept {
     switch (op) {
-    case BinaryOp::Add: return "+";
-    case BinaryOp::Sub: return "-";
-    case BinaryOp::Mul: return "*";
-    case BinaryOp::Div: return "/";
-    case BinaryOp::Mod: return "%";
-    case BinaryOp::Eq:  return "==";
-    case BinaryOp::Neq: return "!=";
-    case BinaryOp::Lt:  return "<";
-    case BinaryOp::Le:  return "<=";
-    case BinaryOp::Gt:  return ">";
-    case BinaryOp::Ge:  return ">=";
-    case BinaryOp::And: return "&&";
-    case BinaryOp::Or:  return "||";
+    case BinaryOp::Add:
+        return "+";
+    case BinaryOp::Sub:
+        return "-";
+    case BinaryOp::Mul:
+        return "*";
+    case BinaryOp::Div:
+        return "/";
+    case BinaryOp::Mod:
+        return "%";
+    case BinaryOp::Eq:
+        return "==";
+    case BinaryOp::Neq:
+        return "!=";
+    case BinaryOp::Lt:
+        return "<";
+    case BinaryOp::Le:
+        return "<=";
+    case BinaryOp::Gt:
+        return ">";
+    case BinaryOp::Ge:
+        return ">=";
+    case BinaryOp::And:
+        return "&&";
+    case BinaryOp::Or:
+        return "||";
     }
     return "<?>";
 }
 
 static std::string_view to_string(UnaryOp op) noexcept {
     switch (op) {
-    case UnaryOp::Neg: return "-";
-    case UnaryOp::Not: return "!";
+    case UnaryOp::Neg:
+        return "-";
+    case UnaryOp::Not:
+        return "!";
     }
     return "<?>";
 }
 
 static int precedence(BinaryOp op) noexcept {
     switch (op) {
-    case BinaryOp::Or:  return 20;
-    case BinaryOp::And: return 30;
+    case BinaryOp::Or:
+        return 20;
+    case BinaryOp::And:
+        return 30;
     case BinaryOp::Eq:
-    case BinaryOp::Neq: return 40;
+    case BinaryOp::Neq:
+        return 40;
     case BinaryOp::Lt:
     case BinaryOp::Le:
     case BinaryOp::Gt:
-    case BinaryOp::Ge:  return 50;
+    case BinaryOp::Ge:
+        return 50;
     case BinaryOp::Add:
-    case BinaryOp::Sub: return 60;
+    case BinaryOp::Sub:
+        return 60;
     case BinaryOp::Mul:
     case BinaryOp::Div:
-    case BinaryOp::Mod: return 70;
+    case BinaryOp::Mod:
+        return 70;
     }
     return -1;
 }
-
 
 static void append_indent(std::string& out, int indent) {
     out.append(static_cast<std::size_t>(indent), ' ');
@@ -66,56 +87,84 @@ static void append_indent(std::string& out, int indent) {
 static void format_expr_into(std::string& out, const Expression& e, int parent_prec, bool is_rhs) {
     std::visit(
         ds_lang::overloaded{
-            [&](const IntegerExpression& n) { out += std::format("{}", n.value); },
-            [&](const IdentifierExpression& id) { out += id.name; },
-            [&](const UnaryExpression& u) {
+            [&](const IntegerExpression& n) -> void { out += std::format("{}", n.value); },
+            [&](const IdentifierExpression& id) -> void { out += id.name; },
+            [&](const UnaryExpression& u) -> void {
                 const int my_prec = Parser::kUnaryPrec;
                 const bool need_parens = my_prec < parent_prec;
-                if (need_parens) out.push_back('(');
+                if (need_parens) {
+                    out += "(";
+                }
 
                 out += std::string(to_string(u.op));
-                if (u.rhs) format_expr_into(out, *u.rhs, my_prec, true);
-                else out += "<null-expr>";
+                if (u.rhs) {
+                    format_expr_into(out, *u.rhs, my_prec, true);
+                } else {
+                    out += "<null-expr>";
+                }
 
-                if (need_parens) out.push_back(')');
+                if (need_parens) {
+                    out += ")";
+                }
             },
-            [&](const BinaryExpression& b) {
+            [&](const BinaryExpression& b) -> void {
                 const int my_prec = precedence(b.op);
                 const bool need_parens =
                     (my_prec < parent_prec) || (is_rhs && my_prec == parent_prec);
 
-                if (need_parens) out.push_back('(');
+                if (need_parens) {
+                    out += "(";
+                }
 
-                if (b.lhs) format_expr_into(out, *b.lhs, my_prec, false);
-                else out += "<null-expr>";
+                if (b.lhs) {
+                    format_expr_into(out, *b.lhs, my_prec, false);
+                } else {
+                    out += "<null-expr>";
+                }
 
-                out.push_back(' ');
+                out += " ";
                 out += to_string(b.op);
-                out.push_back(' ');
+                out += " ";
 
-                if (b.rhs) format_expr_into(out, *b.rhs, my_prec, true);
-                else out += "<null-expr>";
+                if (b.rhs) {
+                    format_expr_into(out, *b.rhs, my_prec, true);
+                } else {
+                    out += "<null-expr>";
+                }
 
-                if (need_parens) out.push_back(')');
+                if (need_parens) {
+                    out += ")";
+                }
             },
-            [&](const CallExpression& c) {
-                // Calls bind tighter than unary/infix; treat as postfix.
+            [&](const CallExpression& c) -> void {
                 const int my_prec = Parser::kCallPrec;
                 const bool need_parens = my_prec < parent_prec;
-                if (need_parens) out.push_back('(');
-
-                if (c.callee) format_expr_into(out, *c.callee, my_prec, false);
-                else out += "<null-expr>";
-
-                out.push_back('(');
-                for (std::size_t i = 0; i < c.args.size(); ++i) {
-                    if (i) out += ", ";
-                    if (c.args[i]) format_expr_into(out, *c.args[i], 0, false);
-                    else out += "<null-expr>";
+                if (need_parens) {
+                    out += "(";
                 }
-                out.push_back(')');
 
-                if (need_parens) out.push_back(')');
+                if (c.callee) {
+                    format_expr_into(out, *c.callee, my_prec, false);
+                } else {
+                    out += "<null-expr>";
+                }
+
+                out += "(";
+                for (std::size_t i = 0; i < c.args.size(); ++i) {
+                    if (i) {
+                        out += ", ";
+                    }
+                    if (c.args[i]) {
+                        format_expr_into(out, *c.args[i], 0, false);
+                    } else {
+                        out += "<null-expr>";
+                    }
+                }
+                out += ")";
+
+                if (need_parens) {
+                    out += ")";
+                }
             },
         },
         e.node);
@@ -134,89 +183,103 @@ static void format_scope_into(std::string& out, const std::vector<Statement>& sc
     for (std::size_t i = 0; i < scope.size(); ++i) {
         append_indent(out, indent);
         format_statement_into(out, scope[i], indent);
-        if (i + 1 < scope.size()) out.push_back('\n');
+        if (i + 1 < scope.size()) {
+            out += ";\n";
+        }
     }
 }
 
 static void format_statement_into(std::string& out, const Statement& s, int indent) {
     std::visit(
         ds_lang::overloaded{
-            [&](const LetStatement& st) {
-                out += "LET ";
+            [&](const IntAssignmentStatement& st) {
+                out += "int ";
                 out += st.identifier;
                 out += " = ";
                 out += st.expr ? format_expression(*st.expr) : "<null-expr>";
             },
             [&](const PrintStatement& st) {
-                out += "PRINT ";
+                out += "print ";
                 out += st.expr ? format_expression(*st.expr) : "<null-expr>";
             },
             [&](const ReturnStatement& st) {
-                out += "RETURN ";
+                out += "return ";
                 out += st.expr ? format_expression(*st.expr) : "<null-expr>";
             },
+            [&](const ScopeStatement& st) {
+                out += "{\n";
+                format_scope_into(out, st.scope, indent + 4);
+                out += "\n}";
+            },
             [&](const IfStatement& st) {
-                out += "IF ";
+                out += "if (";
                 out += st.if_expr ? format_expression(*st.if_expr) : "<null-expr>";
-                out += " THEN\n";
+                out += ") {\n";
 
                 if (!st.then_scope.empty()) {
                     format_scope_into(out, st.then_scope, indent + 4);
-                    out.push_back('\n');
+                    out += "\n";
                 }
 
                 if (!st.else_scope.empty()) {
                     append_indent(out, indent);
-                    out += "ELSE\n";
+                    out += "else\n";
                     format_scope_into(out, st.else_scope, indent + 4);
-                    out.push_back('\n');
+                    out += "\n";
                 }
-
                 append_indent(out, indent);
-                out += "END";
+                out += "}";
             },
             [&](const WhileStatement& st) {
-                out += "WHILE ";
+                out += "while (";
                 out += st.while_expr ? format_expression(*st.while_expr) : "<null-expr>";
-                out += " DO\n";
-
+                out += ") {\n";
                 if (!st.do_scope.empty()) {
                     format_scope_into(out, st.do_scope, indent + 4);
-                    out.push_back('\n');
+                    out += "\n";
                 }
-
                 append_indent(out, indent);
-                out += "END";
+                out += "}";
             },
             [&](const CallExpression& c) {
-                if (c.callee) format_expr_into(out, *c.callee, Parser::kCallPrec, false);
-                else out += "<null-expr>";
-
-                out.push_back('(');
-                for (std::size_t i = 0; i < c.args.size(); ++i) {
-                    if (i) out += ", ";
-                    if (c.args[i]) format_expr_into(out, *c.args[i], 0, false);
-                    else out += "<null-expr>";
+                if (c.callee) {
+                    format_expr_into(out, *c.callee, Parser::kCallPrec, false);
+                } else {
+                    out += "<null-expr>";
                 }
-                out.push_back(')');
+
+                out += "(";
+                for (std::size_t i = 0; i < c.args.size(); ++i) {
+                    if (i > 0) {
+                        out += ", ";
+                    }
+                    if (c.args[i]) {
+                        format_expr_into(out, *c.args[i], 0, false);
+                    } else {
+                        out += "<null-expr>";
+                    }
+                }
+                out += ")";
             },
             [&](const FunctionStatement& st) {
-                out += "FUNC ";
+                out += "func ";
                 out += st.func_name;
                 out += "(";
                 for (std::size_t i = 0; i < st.vars.size(); ++i) {
-                    if (i) out += ", ";
+                    if (i > 0) {
+                        out += ", ";
+                    }
                     out += st.vars[i];
                 }
-                out += ")\n";
+                out += ") {\n";
 
                 if (!st.statements.empty()) {
                     format_scope_into(out, st.statements, indent + 4);
-                    out.push_back('\n');
                 }
 
+                out += '\n';
                 append_indent(out, indent);
-                out += "END";
+                out += "}";
             },
         },
         s.node);
@@ -226,6 +289,62 @@ std::string format_statement(const Statement& s) {
     std::string out;
     out.reserve(128);
     format_statement_into(out, s, 0);
+    return out;
+}
+
+// -----------------------------------------------------------------------------
+// Bytecode formatting
+// -----------------------------------------------------------------------------
+
+std::string format_bytecode_operation(const BytecodeOperation& op) {
+    return std::visit(
+        ds_lang::overloaded{
+            [&](const BytecodePushI64& o) { return std::format("PUSH_I64 {}", o.value); },
+            [&](const BytecodeAdd&) { return std::string("ADD"); },
+            [&](const BytecodeSub&) { return std::string("SUB"); },
+            [&](const BytecodeMult&) { return std::string("MULT"); },
+            [&](const BytecodeDiv&) { return std::string("DIV"); },
+            [&](const BytecodeMod&) { return std::string("MOD"); },
+
+            [&](const BytecodeEQ&) { return std::string("EQ"); },
+            [&](const BytecodeNEQ&) { return std::string("NEQ"); },
+            [&](const BytecodeLT&) { return std::string("LT"); },
+            [&](const BytecodeLE&) { return std::string("LE"); },
+            [&](const BytecodeGT&) { return std::string("GT"); },
+            [&](const BytecodeGE&) { return std::string("GE"); },
+
+            [&](const BytecodeNEG&) { return std::string("NEG"); },
+            [&](const BytecodeNOT&) { return std::string("NOT"); },
+
+            [&](const BytecodePop&) { return std::string("POP"); },
+
+            [&](const BytecodeLoadLocal& o) { return std::format("LOAD_LOCAL {}", o.slot); },
+            [&](const BytecodeStoreLocal& o) { return std::format("STORE_LOCAL {}", o.slot); },
+
+            [&](const BytecodeJmp& o) { return std::format("JMP {}", o.target_ip); },
+            [&](const BytecodeJmpFalse& o) { return std::format("JMP_FALSE {}", o.target_ip); },
+            [&](const BytecodeJmpTrue& o) { return std::format("JMP_TRUE {}", o.target_ip); },
+
+            [&](const BytecodeCall& o) { return std::format("CALL {}", o.func_id); },
+            [&](const BytecodeCallArgs& o) { return std::format("CALL_ARGS {} {}", o.func_id, o.argc); },
+
+            [&](const BytecodeReturn&) { return std::string("RETURN"); },
+
+            [&](const BytecodePrint&) { return std::string("PRINT"); },
+        },
+        op);
+}
+
+std::string format_function_bytecode(const FunctionBytecode& fn) {
+    std::string out;
+    out += std::format("FunctionBytecode(num_locals={}, num_params={}, code=[", fn.num_locals, fn.num_params);
+    for (std::size_t i = 0; i < fn.code.size(); ++i) {
+        if (i) {
+            out += ", ";
+        }
+        out += format_bytecode_operation(fn.code[i]);
+    }
+    out += "])";
     return out;
 }
 

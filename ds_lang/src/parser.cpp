@@ -6,6 +6,7 @@
 #include <string_view>
 #include <utility>
 #include <variant>
+#include <vector>
 
 #include "parser.hpp"
 #include "token.hpp"
@@ -31,8 +32,8 @@ const Token &Parser::advance() {
     return previous();
 }
 
-void Parser::skip_newlines() {
-    while (match(TokenKind::Newline)) {
+void Parser::skip_eos() {
+    while (match(TokenKind::Eos)) {
     }
 }
 
@@ -269,12 +270,12 @@ std::unique_ptr<Expression> Parser::nud(const Token &t) {
 }
 
 Statement Parser::parse_statement() {
-    skip_newlines();
+    skip_eos();
     if (at_end()) {
         throw std::runtime_error("Trying to parse statement at the end");
     }
     TokenKind k = peek().kind;
-    if (k == TokenKind::KWLet) {
+    if (k == TokenKind::KWInt) {
         return {parse_let_statement()};
     } else if (k == TokenKind::KWPrint) {
         return {parse_print_statement()};
@@ -286,43 +287,63 @@ Statement Parser::parse_statement() {
         return {parse_if_statement()};
     } else if (k == TokenKind::KWWhile) {
         return {parse_while_statement()};
+    } else if (k == TokenKind::LBrace) {
+        return {parse_scope_statement()};
     } else {
         error_here("Peeked TokenKind can't be a start of a statement scope");
     }
     std::unreachable();
 }
 
-std::vector<Statement> Parser::parse_scope()
-{
+std::vector<Statement> Parser::parse_program() {
     std::vector<Statement> statements;
-    while (true) {
-        skip_newlines();
-        const TokenKind k = peek().kind;
-        if (k == TokenKind::KWEnd || k == TokenKind::KWElse || k == TokenKind::Eof) {
-            break;
-        }
+
+    skip_eos();
+    while (peek().kind != TokenKind::Eof) {
         statements.push_back(parse_statement());
+        skip_eos();
     }
     return statements;
 }
 
-LetStatement Parser::parse_let_statement() {
-    (void)consume(TokenKind::KWLet, "Expected 'LET' at start of assignment statement");
+std::vector<Statement> Parser::parse_scope()
+{
+    (void)consume(TokenKind::LBrace, "Scope parsing must start at {");
+    std::vector<Statement> statements;
+    int i = 0;
+    while (true) {
+        skip_eos();
+        const TokenKind k = peek().kind;
+        if (k == TokenKind::RBrace) {            
+            (void)consume(TokenKind::RBrace, "Logic error on checked RBrace eating, shouldn't happen");
+            break;
+        }
+        statements.push_back(parse_statement());
+        ++i;
+        if(i > 1000) {
+            throw std::runtime_error("Overflow on parse scope");
+        }
+    }
+    return statements;
+}
 
-    const Token &id = consume(TokenKind::Identifier, "Expected identifier after 'LET'");
-    (void)consume(TokenKind::OpAssign, "Expected '=' after identifier in LET statement");
+IntAssignmentStatement Parser::parse_let_statement() {
+    (void)consume(TokenKind::KWInt, "Expected 'LET' at start of assignment statement");
+
+    const Token &id = consume(TokenKind::Identifier, "Expected identifier after 'int'");
+    (void)consume(TokenKind::OpAssign, "Expected '=' after identifier in IntAssignment statement");
 
     auto rhs = parse_expr_bp(0);
 
-    while (match(TokenKind::Newline)) {
+    while (match(TokenKind::Eos)) {
     }
-    return LetStatement{.identifier = std::string(id.lexeme), .expr = std::move(rhs)};
+    return IntAssignmentStatement{.identifier = std::string(id.lexeme), .expr = std::move(rhs)};
 }
 
 PrintStatement Parser::parse_print_statement() {
     (void)consume(TokenKind::KWPrint, "Expected 'PRINT' at start of assignment statement");
     auto rhs = parse_expr_bp(0);
-    while (match(TokenKind::Newline)) {
+    while (match(TokenKind::Eos)) {
     }
     return PrintStatement{.expr = std::move(rhs)};
 }
@@ -330,42 +351,47 @@ PrintStatement Parser::parse_print_statement() {
 ReturnStatement Parser::parse_return_statement() {
     (void)consume(TokenKind::KWReturn, "Expected 'RETURN' at start of assignment statement");
     auto rhs = parse_expr_bp(0);
-    while (match(TokenKind::Newline)) {
+    while (match(TokenKind::Eos)) {
     }
     return ReturnStatement{.expr = std::move(rhs)};
 }
+ScopeStatement Parser::parse_scope_statement() {
+    return { parse_scope() };
+}
+
+
+WhileStatement Parser::parse_while_statement() {
+    (void)consume(TokenKind::KWWhile, "Expected 'while' at start of assignment statement");
+    (void)consume(TokenKind::LParen, "Expected '(' after while");
+    auto while_expr = parse_expr_bp(0);
+    (void)consume(TokenKind::RParen, "Expected '(' after while");
+    std::vector<Statement> do_scope = parse_scope();
+    return WhileStatement{
+        .while_expr = std::move(while_expr),
+        .do_scope = std::move(do_scope)};
+}
 IfStatement Parser::parse_if_statement() {
-    (void)consume(TokenKind::KWIf, "Expected 'IF' at start of assignment statement");
+    (void)consume(TokenKind::KWIf, "Expected 'if' at start of assignment statement");
+    (void)consume(TokenKind::LParen, "Expected '(' after if and before condition");
     auto if_expr = parse_expr_bp(0);
-    (void)consume(TokenKind::KWThen, "Expected 'THEN' after 'IF' expression");
+    (void)consume(TokenKind::RParen, "Expected ')' after if condition");
     std::vector<Statement> then_scope = parse_scope();
     std::vector<Statement> else_scope{};
     if (match(TokenKind::KWElse)) {
-        skip_newlines();
+        skip_eos();
         else_scope = parse_scope();
     }
-    (void)consume(TokenKind::KWEnd, "Expected 'END' after if statement");
     return IfStatement{
         .if_expr = std::move(if_expr),
         .then_scope = std::move(then_scope),
         .else_scope = std::move(else_scope)};
-}
-WhileStatement Parser::parse_while_statement() {
-    (void)consume(TokenKind::KWWhile, "Expected 'WHILE' at start of assignment statement");
-    auto while_expr = parse_expr_bp(0);
-    (void)consume(TokenKind::KWDo, "Expected 'DO' after 'WHILE' expression");
-    std::vector<Statement> do_scope = parse_scope();
-    (void)consume(TokenKind::KWEnd, "Expected 'END' after while do statement");
-    return WhileStatement{
-        .while_expr = std::move(while_expr),
-        .do_scope = std::move(do_scope)};
 }
 FunctionStatement Parser::parse_func_statement() {
     (void)consume(TokenKind::KWFunc, "Expected 'FUNC' at start of assignment statement");
     std::string func_name{consume(TokenKind::Identifier, "Expected Identifier after FUNC").lexeme};
     (void)consume(TokenKind::LParen, "Expected '(' after function name");
     std::vector<std::string> vars;
-    while (peek().kind != TokenKind::RParen) {
+    while (peek().kind != TokenKind::RParen) { // extract the identifiers x, y from "if(x,y)"
         if (peek().kind == TokenKind::Identifier) {
             std::string name{consume(TokenKind::Identifier, "Peeked Function Var Identifier, this shouldn't fail").lexeme};
             if (std::ranges::contains(vars, name)) {
@@ -379,7 +405,6 @@ FunctionStatement Parser::parse_func_statement() {
     }
     (void)consume(TokenKind::RParen, "Expected ')' after function arguments");
     std::vector<Statement> statements = parse_scope();
-    (void)consume(TokenKind::KWEnd, "Expected 'END' after if statement");
 
     return FunctionStatement{
         .func_name = std::move(func_name),

@@ -14,7 +14,7 @@ void Lexer::compute_line_col_at(std::string_view code, usize pos, int &line, int
     line = 0;
     col = 0;
     for (usize i = 0; i < pos; ++i) {
-        if (is_newline(code[i])) {
+        if (code[i] == '\n') {
             ++line;
             col = 0;
         } else {
@@ -25,16 +25,13 @@ void Lexer::compute_line_col_at(std::string_view code, usize pos, int &line, int
 
 static TokenKind keyword_or_identifier(std::string_view s) {
     // clang-format off
-    if (s == "LET")    return TokenKind::KWLet;
-    if (s == "PRINT")  return TokenKind::KWPrint;
-    if (s == "FUNC")   return TokenKind::KWFunc;
-    if (s == "RETURN") return TokenKind::KWReturn;
-    if (s == "IF")     return TokenKind::KWIf;
-    if (s == "THEN")   return TokenKind::KWThen;
-    if (s == "ELSE")   return TokenKind::KWElse;
-    if (s == "WHILE")  return TokenKind::KWWhile;
-    if (s == "DO")     return TokenKind::KWDo;
-    if (s == "END")    return TokenKind::KWEnd;
+    if (s == "int")    return TokenKind::KWInt;
+    if (s == "print")  return TokenKind::KWPrint;
+    if (s == "func")   return TokenKind::KWFunc;
+    if (s == "return") return TokenKind::KWReturn;
+    if (s == "if")     return TokenKind::KWIf;
+    if (s == "else")   return TokenKind::KWElse;
+    if (s == "while")  return TokenKind::KWWhile;
     // clang-format on
     return TokenKind::Identifier;
 }
@@ -81,11 +78,11 @@ std::vector<Token> Lexer::tokenize_range(usize left, usize right) const {
     usize pos = left;
     std::vector<Token> out;
 
-    auto new_char = [&] {
+    auto new_char = [&] -> void {
         ++pos;
         ++col;
     };
-    auto new_line = [&] {
+    auto new_line = [&] -> void {
         ++pos;
         ++line;
         col = 0;
@@ -101,17 +98,35 @@ std::vector<Token> Lexer::tokenize_range(usize left, usize right) const {
             break;
         }
 
-        while (pos < right && is_hspace(code_[pos])) {
-            new_char();
+        while (pos < right) {
+            const char c = code_[pos];
+            if (c == '\n') {
+                new_line();
+                continue;
+            }
+            if (c == '\r') { // \r\n is windows specific newline shenanigans
+                if (pos + 1 < right && code_[pos + 1] == '\n') {
+                    ++pos;
+                    new_line();
+                } else {
+                    new_char();
+                }
+                continue;
+            }
+            if (is_whitespace(c)) {
+                new_char();
+                continue;
+            }
+            break;
         }
         if (pos >= right) {
             out.emplace_back(TokenKind::Eof, std::string_view{}, line, col);
             break;
         }
 
-        if (is_newline(code_[pos])) {
-            out.emplace_back(TokenKind::Newline, code_.substr(pos, 1), line, col);
-            new_line();
+        if (is_eos(code_[pos])) {
+            out.emplace_back(TokenKind::Eos, code_.substr(pos, 1), line, col);
+            new_char();
             continue;
         }
 
@@ -168,6 +183,22 @@ std::vector<Token> Lexer::tokenize_range(usize left, usize right) const {
             continue;
         case ')':
             emit(TokenKind::RParen, start, 1, tok_line, tok_col);
+            new_char();
+            continue;
+        case '{':
+            emit(TokenKind::LBrace, start, 1, tok_line, tok_col);
+            new_char();
+            continue;
+        case '}':
+            emit(TokenKind::RBrace, start, 1, tok_line, tok_col);
+            new_char();
+            continue;
+        case '[':
+            emit(TokenKind::LBracket, start, 1, tok_line, tok_col);
+            new_char();
+            continue;
+        case ']':
+            emit(TokenKind::RBracket, start, 1, tok_line, tok_col);
             new_char();
             continue;
         case ',':

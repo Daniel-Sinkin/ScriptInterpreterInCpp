@@ -76,7 +76,7 @@ struct Expression {
 
 struct Statement;
 
-struct LetStatement {
+struct IntAssignmentStatement {
     std::string identifier;
     std::unique_ptr<Expression> expr;
 };
@@ -87,6 +87,10 @@ struct PrintStatement {
 
 struct ReturnStatement {
     std::unique_ptr<Expression> expr;
+};
+
+struct ScopeStatement {
+    std::vector<Statement> scope;
 };
 
 struct IfStatement {
@@ -108,12 +112,13 @@ struct FunctionStatement {
 
 struct Statement {
     using Variant = std::variant<
-        LetStatement,
+        IntAssignmentStatement,
         PrintStatement,
         ReturnStatement,
         IfStatement,
         WhileStatement,
-        FunctionStatement>;
+        FunctionStatement,
+        ScopeStatement>;
     Variant node;
 };
 
@@ -131,9 +136,11 @@ public:
 
     [[nodiscard]] Statement parse_statement();
     [[nodiscard]] std::vector<Statement> parse_scope(); // Parse statements until you see an END or EOF
-    [[nodiscard]] LetStatement parse_let_statement();
+    [[nodiscard]] std::vector<Statement> parse_program(); // Parse statements until you see an END or EOF
+    [[nodiscard]] IntAssignmentStatement parse_let_statement();
     [[nodiscard]] PrintStatement parse_print_statement();
     [[nodiscard]] ReturnStatement parse_return_statement();
+    [[nodiscard]] ScopeStatement parse_scope_statement();
     [[nodiscard]] IfStatement parse_if_statement();
     [[nodiscard]] WhileStatement parse_while_statement();
     [[nodiscard]] FunctionStatement parse_func_statement();
@@ -151,7 +158,7 @@ private:
     [[nodiscard]] bool match(TokenKind k);
     [[nodiscard]] const Token &consume(TokenKind kind, std::string_view msg);
 
-    void skip_newlines();
+    void skip_eos();
 
     [[nodiscard]] std::unique_ptr<Expression> parse_expr_bp(int min_bp);
     [[nodiscard]] std::unique_ptr<Expression> nud(const Token &t);
@@ -168,14 +175,11 @@ private:
 
     static bool is_expr_terminator(TokenKind k) noexcept {
         switch (k) {
-        case TokenKind::Newline:
+        case TokenKind::Eos:
         case TokenKind::Eof:
         case TokenKind::RParen:
         case TokenKind::Comma:
-        case TokenKind::KWThen:
-        case TokenKind::KWDo:
         case TokenKind::KWElse:
-        case TokenKind::KWEnd:
             return true;
         default:
             return false;
