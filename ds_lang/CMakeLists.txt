@@ -139,3 +139,35 @@ foreach(tc IN LISTS PARSER_TEST_CASES)
     add_test(NAME parser.${tc}
              COMMAND ds_lang_parser_tests --case ${tc})
 endforeach()
+
+add_executable(ds_lang_vm_tests
+    tests/test_vm.cpp
+)
+
+target_include_directories(ds_lang_vm_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests
+)
+
+target_link_libraries(ds_lang_vm_tests PRIVATE ds_lang ds_lang_warnings)
+target_compile_features(ds_lang_vm_tests PRIVATE cxx_std_23)
+
+set(VM_TEST_CASES
+    push_and_pop
+    arithmetic_ops
+    div0_throws
+    mod0_throws
+    comparison_ops
+    unary_ops
+    locals_load_store
+    jmp_skips_code
+    jmpfalse_jmptrue
+    call_and_return_with_args
+    nested_calls
+    print_records_value
+    step_past_end_throws
+)
+
+foreach(tc IN LISTS VM_TEST_CASES)
+    add_test(NAME vm.${tc}
+             COMMAND ds_lang_vm_tests --case ${tc})
+endforeach()
