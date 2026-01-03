@@ -12,22 +12,22 @@
 
 namespace ds_lang {
 enum class BinaryOp {
-    Add,    // +
-    Sub,    // -
-    Mul,    // *
-    Div,    // /
-    Mod,    // %
+    Add, // +
+    Sub, // -
+    Mul, // *
+    Div, // /
+    Mod, // %
 
-    Eq,     // ==
-    Neq,    // !=
+    Eq,  // ==
+    Neq, // !=
 
-    Lt,     // <
-    Le,     // <=
-    Gt,     // >
-    Ge,     // >=
+    Lt, // <
+    Le, // <=
+    Gt, // >
+    Ge, // >=
 
-    And,    // &&
-    Or,     // ||
+    And, // &&
+    Or,  // ||
 };
 
 enum class UnaryOp {
@@ -112,8 +112,6 @@ struct Statement {
     Variant node;
 };
 
-// ===== Parser =====
-
 class Parser {
 public:
     explicit Parser(const std::vector<Token> &tokens) noexcept
@@ -159,6 +157,21 @@ private:
 
     [[noreturn]] void error_here(std::string_view msg) const;
 
+    static bool is_expr_terminator(TokenKind k) noexcept {
+        switch (k) {
+        case TokenKind::Newline:
+        case TokenKind::Eof:
+        case TokenKind::RParen:
+        case TokenKind::Comma:
+        case TokenKind::KWThen:
+        case TokenKind::KWDo:
+        case TokenKind::KWElse:
+        case TokenKind::KWEnd:
+            return true;
+        default:
+            return false;
+        }
+    }
 };
 
 } // namespace ds_lang

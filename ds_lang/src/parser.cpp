@@ -168,28 +168,29 @@ std::unique_ptr<Expression> Parser::parse_expression() {
 }
 
 std::unique_ptr<Expression> Parser::parse_expr_bp(int min_bp) {
-    if (at_end())
+    if (at_end()) {
         error_here("Expected expression but reached end of input");
+    }
 
-    // prefix / primary
     const Token first = advance();
     auto lhs = nud(first);
 
-    // infix loop
     while (!at_end()) {
-        const Token &op = peek();
-        const int lbp = infix_lbp(op.kind);
+        const TokenKind k = peek().kind;
+        if(is_expr_terminator(k)) break;
+
+        const int lbp = infix_lbp(k);
         if (lbp < min_bp)
             break;
 
-        (void)advance(); // consume operator
-        const int rbp = infix_rbp(op.kind);
+        (void)advance();
+        const int rbp = infix_rbp(k);
 
         auto rhs = parse_expr_bp(rbp);
 
         auto e = std::make_unique<Expression>();
         e->node = BinaryExpression{
-            .op = to_binary_op(op.kind),
+            .op = to_binary_op(k),
             .lhs = std::move(lhs),
             .rhs = std::move(rhs),
         };
@@ -240,7 +241,8 @@ std::unique_ptr<Expression> Parser::nud(const Token &t) {
     }
 }
 
-Statement Parser::parse_statement() {
+Staement Parser::parse_statement() {
+    skip_newlines();
     if (at_end()) {
         throw std::runtime_error("Trying to parse statement at the end");
     }
@@ -293,21 +295,15 @@ ReturnStatement Parser::parse_return_statement() {
 }
 IfStatement Parser::parse_if_statement() {
     (void)consume(TokenKind::KWIf, "Expected 'IF' at start of assignment statement");
-    skip_newlines();
     auto if_expr = parse_expr_bp(0);
     (void)consume(TokenKind::KWThen, "Expected 'THEN' after 'IF' expression");
-    skip_newlines();
     std::unique_ptr<Statement> then_ptr = std::make_unique<Statement>(parse_statement());
-    skip_newlines();
     std::unique_ptr<Statement> else_ptr;
-    skip_newlines();
     if (match(TokenKind::KWElse)) {
         skip_newlines();
         else_ptr = std::make_unique<Statement>(parse_statement());
     }
-    skip_newlines();
     (void)consume(TokenKind::KWEnd, "Expected 'END' after if statement");
-    skip_newlines();
     return IfStatement{
         .if_expr = std::move(if_expr),
         .then_statement = std::move(then_ptr),
@@ -315,10 +311,8 @@ IfStatement Parser::parse_if_statement() {
 }
 WhileStatement Parser::parse_while_statement() {
     (void)consume(TokenKind::KWWhile, "Expected 'WHILE' at start of assignment statement");
-    skip_newlines();
     auto while_expr = parse_expr_bp(0);
     (void)consume(TokenKind::KWDo, "Expected 'DO' after 'WHILE' expression");
-    skip_newlines();
     // Need a variable SCOPE not a single statement, a scope would be a std::vector of statements
     std::unique_ptr<Statement> do_ptr = std::make_unique<Statement>(parse_statement());
     (void)consume(TokenKind::KWEnd, "Expected 'END' after while do statement");
@@ -328,10 +322,8 @@ WhileStatement Parser::parse_while_statement() {
 }
 FunctionStatement Parser::parse_func_statement() {
     (void)consume(TokenKind::KWFunc, "Expected 'FUNC' at start of assignment statement");
-    skip_newlines();
     std::string_view func_name = consume(TokenKind::Identifier, "Expected Identifier after FUNC").lexeme;
     (void)consume(TokenKind::LParen, "Expected '(' after function name");
-    skip_newlines();
     std::vector<std::string_view> vars;
     while (peek().kind != TokenKind::RParen) {
         if (peek().kind == TokenKind::Identifier) {
@@ -346,11 +338,8 @@ FunctionStatement Parser::parse_func_statement() {
         }
     }
     (void)consume(TokenKind::RParen, "Expected ')' after function arguments");
-    skip_newlines();
     auto statement_ptr = std::make_unique<Statement>(parse_statement());
-    skip_newlines();
     (void)consume(TokenKind::KWEnd, "Expected 'END' after if statement");
-    skip_newlines();
 
     return FunctionStatement{
         .func_name = func_name,
