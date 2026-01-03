@@ -131,6 +131,7 @@ public:
 
     [[nodiscard]] Statement parse_statement();
     [[nodiscard]] std::vector<Statement> parse_scope(); // Parse statements until you see an END or EOF
+    [[nodiscard]] std::vector<Statement> parse_program(); // Parse statements until you see an END or EOF
     [[nodiscard]] LetStatement parse_let_statement();
     [[nodiscard]] PrintStatement parse_print_statement();
     [[nodiscard]] ReturnStatement parse_return_statement();

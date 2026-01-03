@@ -169,6 +169,14 @@ constexpr std::string_view explain(TokenKind k) noexcept {
         return "Left parenthesis “(”.";
     case TokenKind::RParen:
         return "Right parenthesis “)”.";
+    case TokenKind::LBrace:
+        return "Left Brace “{”.";
+    case TokenKind::RBrace:
+        return "Left Brace “}”.";
+    case TokenKind::LBracket:
+        return "Left parenthesis “[”.";
+    case TokenKind::RBracket:
+        return "Right bracket “]”.";
     case TokenKind::Comma:
         return "Comma “,” separator.";
 

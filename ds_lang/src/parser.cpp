@@ -6,6 +6,7 @@
 #include <string_view>
 #include <utility>
 #include <variant>
+#include <vector>
 
 #include "parser.hpp"
 #include "token.hpp"
@@ -292,16 +293,27 @@ Statement Parser::parse_statement() {
     std::unreachable();
 }
 
+std::vector<Statement> Parser::parse_program() {
+    std::vector<Statement> statements;
+    return statements;
+}
+
 std::vector<Statement> Parser::parse_scope()
 {
+    (void)consume(TokenKind::LBrace, "Scope parsing must start at {");
     std::vector<Statement> statements;
+    int i = 0;
     while (true) {
         skip_eos();
         const TokenKind k = peek().kind;
-        if (k == TokenKind::KWEnd || k == TokenKind::KWElse || k == TokenKind::Eof) {
+        if (k == TokenKind::RBrace) {
             break;
         }
         statements.push_back(parse_statement());
+        ++i;
+        if(i > 1000) {
+            throw std::runtime_error("Overflow on parse scope");
+        }
     }
     return statements;
 }
@@ -379,7 +391,6 @@ FunctionStatement Parser::parse_func_statement() {
     }
     (void)consume(TokenKind::RParen, "Expected ')' after function arguments");
     std::vector<Statement> statements = parse_scope();
-    (void)consume(TokenKind::KWEnd, "Expected 'END' after if statement");
 
     return FunctionStatement{
         .func_name = std::move(func_name),
