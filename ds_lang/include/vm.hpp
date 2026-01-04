@@ -2,11 +2,16 @@
 #pragma once
 
 #include <cstddef>
+#include <memory>
 #include <optional>
+#include <utility>
 #include <variant>
 #include <vector>
+#include <limits>
 
+#include "parser.hpp"
 #include "types.hpp"
+#include "util.hpp"
 
 namespace ds_lang {
 
@@ -99,6 +104,162 @@ struct FunctionBytecode {
     u32 num_params{0};
 };
 
+struct BytecodeBuilder {
+    std::vector<BytecodeOperation> code_;
+
+    using IP = usize; // IP = Instruction Pointer
+    usize INVALID_IP = std::numeric_limits<IP>::max();
+
+    IP current_ip() const noexcept {
+        return code_.size();
+    }
+
+    IP emit(BytecodeOperation op) {
+        const IP ip = current_ip();
+        code_.push_back(std::move(op));
+        return ip;
+    }
+
+    void patch_jump(IP at, IP target) {
+        auto& op = code_.at(at);
+        std::visit(
+            overloaded{
+                [&](BytecodeJmp& j) { j.target_ip = target; },
+                [&](BytecodeJmpFalse& j) { j.target_ip = target; },
+                [&](BytecodeJmpTrue& j) { j.target_ip = target; },
+                [&](auto&) { throw std::runtime_error("patch_jump: not a jump op"); },
+            },
+            op
+        );
+    }
+
+
+    void build_expression(const Expression& expr) {
+        std::visit(
+            overloaded{
+                [&](const IntegerExpression &e) -> void {
+                    code_.push_back(BytecodePushI64{e.value});
+                },
+                [&](const IdentifierExpression &e) -> void {
+                    (void)e;
+                    std::unreachable();
+                },
+                [&](const UnaryExpression &e) -> void {
+                    assert(e.rhs);
+                    build_expression(*e.rhs);
+                    switch(e.op) {
+                        case UnaryOp::Neg:
+                            code_.push_back(BytecodeNEG{});
+                            break;
+                        case UnaryOp::Not:
+                            code_.push_back(BytecodeNOT{});
+                            break;
+                    }
+                },
+                [&](const BinaryExpression &e) -> void {
+                    assert(e.lhs);
+                    assert(e.rhs);
+                    std::vector<BytecodeOperation> out;
+
+                    build_expression(*e.lhs);
+
+                    IP jmp_ptr = INVALID_IP;
+                    if(e.op == BinaryOp::And) {
+                        jmp_ptr = emit(BytecodeJmpFalse{});
+                    }
+                    else if(e.op == BinaryOp::Or) {
+                        jmp_ptr = emit(BytecodeJmpTrue{});
+                    }
+
+                    IP rhs_ptr = current_ip();
+                    build_expression(*e.rhs);
+                    if(jmp_ptr != INVALID_IP) {
+                        patch_jump(jmp_ptr, rhs_ptr);
+                        return;
+                    }
+
+                    switch(e.op) {
+                        case BinaryOp::Add:
+                            out.push_back(BytecodeAdd{});
+                            break;
+                        case BinaryOp::Sub:
+                            out.push_back(BytecodeSub{});
+                            break;
+                        case BinaryOp::Mul:
+                            out.push_back(BytecodeMult{});
+                            break;
+                        case BinaryOp::Div:
+                            out.push_back(BytecodeDiv{});
+                            break;
+                        case BinaryOp::Mod:
+                            out.push_back(BytecodeMod{});
+                            break;
+                        case BinaryOp::Eq:
+                            out.push_back(BytecodeEQ{});
+                            break;
+                        case BinaryOp::Neq:
+                            out.push_back(BytecodeNEQ{});
+                            break;
+                        case BinaryOp::Lt:
+                            out.push_back(BytecodeLT{});
+                            break;
+                        case BinaryOp::Le:
+                            out.push_back(BytecodeLE{});
+                            break;
+                        case BinaryOp::Gt:
+                            out.push_back(BytecodeGT{});
+                            break;
+                        case BinaryOp::Ge:
+                            out.push_back(BytecodeGE{});
+                            break;
+                        case BinaryOp::And:
+                        case BinaryOp::Or:
+                            std::unreachable();
+                    }
+                },
+                [&](const CallExpression &e) -> void {
+                    (void)e;
+                    std::unreachable();
+                }},
+            expr.node);
+    }
+
+    void build_statement(const Statement& statement) {
+        std::visit(
+            overloaded{
+                [&](const IntAssignmentStatement &st) -> void {
+                    (void)st;
+                    std::unreachable();
+                },
+                [&]([[maybe_unused]] const PrintStatement &st) -> void {
+                    build_expression(*st.expr);
+                    emit(BytecodePrint{});
+                },
+                [&]([[maybe_unused]] const ReturnStatement &st) -> void {
+                    build_expression(*st.expr);
+                    emit(BytecodeReturn{});
+                },
+                [&](const ScopeStatement &st) -> void {
+                    (void)st;
+                    std::unreachable();
+                },
+                [&](const IfStatement &st) -> void {
+                    (void)st;
+                    std::unreachable();
+                },
+                [&](const WhileStatement &st) -> void {
+                    (void)st;
+                    std::unreachable();
+                },
+                [&](const FunctionStatement &st) -> void {
+                    (void)st;
+                    std::unreachable();
+                },
+            },
+            statement.node);
+    }
+};
+
 class VirtualMachine {
 public:
     explicit VirtualMachine(bool immediate_print = true) noexcept
@@ -106,25 +267,24 @@ public:
 
     void clear();
 
-    // Adds a function and returns its function id.
     [[nodiscard]] u32 add_function(FunctionBytecode fn);
 
     void set_entry_function(u32 func_id);
 
-    // Resets the VM into a runnable state at entry function.
     void reset();
 
     [[nodiscard]] bool is_active() const noexcept { return is_active_; }
 
-    // Executes one instruction of the current frame.
     void step();
 
-    // Runs until the VM halts (normal return from entry) or throws.
     void run();
 
-    [[nodiscard]] const std::vector<i64>& stack() const noexcept { return stack_; }
-    [[nodiscard]] const std::vector<i64>& print_buffer() const noexcept { return print_buffer_; }
+    [[nodiscard]] const std::vector<i64> &stack() const noexcept { return stack_; }
+    [[nodiscard]] const std::vector<i64> &print_buffer() const noexcept { return print_buffer_; }
 
+    i64 get_return_value() {
+        return *return_value_;
+    }
 private:
     struct Frame {
         u32 func_id{0};
@@ -140,12 +300,14 @@ private:
     std::vector<Frame> call_stack_{};
 
     bool immediate_print_{true};
-    bool is_active_{false};
+    bool is_active_{true};
 
-    [[nodiscard]] const FunctionBytecode& current_function() const;
-    [[nodiscard]] FunctionBytecode& current_function();
-    [[nodiscard]] Frame& current_frame();
-    [[nodiscard]] const Frame& current_frame() const;
+    std::unique_ptr<i64> return_value_{nullptr};
+
+    [[nodiscard]] const FunctionBytecode &current_function() const;
+    [[nodiscard]] FunctionBytecode &current_function();
+    [[nodiscard]] Frame &current_frame();
+    [[nodiscard]] const Frame &current_frame() const;
 
     [[nodiscard]] i64 pop();
     void push(i64 v);
@@ -155,7 +317,7 @@ private:
     void do_call(u32 func_id, u32 argc);
     void do_return();
 
-    void exec_op(const BytecodeOperation& op);
+    void exec_op(const BytecodeOperation &op);
 };
 
 } // namespace ds_lang

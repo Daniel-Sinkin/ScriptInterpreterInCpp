@@ -145,7 +145,8 @@ void VirtualMachine::do_return() {
     if (stack_.empty()) {
         throw std::runtime_error("VM return: missing return value on stack");
     }
-    const i64 ret = pop();
+    i64 ret = pop();
+    return_value_ = std::make_unique<i64>(ret);
 
     if (call_stack_.empty()) {
         throw std::runtime_error("VM return: call stack empty");
@@ -168,8 +169,9 @@ void VirtualMachine::exec_op(const BytecodeOperation& op) {
 
     std::visit(
         ds_lang::overloaded{
-            [&](const BytecodePushI64& o) { push(o.value); },
-
+            [&](const BytecodePushI64& o) {
+                push(o.value);
+            },
             [&](const BytecodeAdd&) {
                 const i64 rhs = pop();
                 const i64 lhs = pop();
@@ -268,7 +270,9 @@ void VirtualMachine::exec_op(const BytecodeOperation& op) {
             [&](const BytecodeCall& o) { do_call(o.func_id, 0); },
             [&](const BytecodeCallArgs& o) { do_call(o.func_id, o.argc); },
 
-            [&](const BytecodeReturn&) { do_return(); },
+            [&](const BytecodeReturn&) {
+                do_return();
+            },
 
             [&](const BytecodePrint&) {
                 if (stack_.empty()) {
@@ -297,7 +301,7 @@ void VirtualMachine::step() {
 
     if (fr.ip >= f.code.size()) {
         // If we hit end of function without explicit return => error.
-        throw std::runtime_error("VM: fell off end of function without RETURN");
+        throw std::runtime_error("VM: fell off end of function without return");
     }
 
     const BytecodeOperation op = f.code[fr.ip];

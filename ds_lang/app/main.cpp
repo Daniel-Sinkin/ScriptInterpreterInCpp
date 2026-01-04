@@ -6,8 +6,6 @@
 #include "formatters.hpp"
 #include "lexer.hpp"
 #include "parser.hpp"
-#include "token.hpp"
-#include "util.hpp"
 #include "vm.hpp"
 
 static ds_lang::FunctionBytecode build_function_square() {
@@ -107,10 +105,35 @@ void bytecode_example() {
 
 int main() {
     using namespace ds_lang;
-    std::string code = "int x = 5;";
-    std::vector<Statement> statements = Parser{Lexer{code}.tokenize_all()}.parse_program();
+    std::string code = "return (1 + 2);";
+    std::vector<Token> tokens = Lexer{code}.tokenize_all();
+    std::vector<Statement> statements = Parser{tokens}.parse_program();
 
+    std::println("Tokens:");
+    for(const Token& token: tokens) {
+        std::println("{}", token);
+    };
+    std::println("");
+
+    std::println("Statements:");
     for(const Statement& statement : statements) {
         std::println("{}", statement);
-    }
+    };
+    std::println("");
+    
+
+    BytecodeBuilder builder{};
+    builder.build_statement(statements[0]);
+
+    FunctionBytecode f;
+    f.num_locals = 0;
+    f.num_params = 0;
+    f.code = std::move(builder.code_);
+
+    VirtualMachine vm{true};
+    (void)vm.add_function(f);
+    vm.set_entry_function(0);
+    vm.reset();
+    vm.run();
+    std::println("Return Value = {}", vm.get_return_value());
 }

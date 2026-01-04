@@ -245,6 +245,7 @@ static void format_statement_into(std::string& out, const Statement& s, int inde
                 out += "}";
             },
             [&](const CallExpression& c) {
+                assert(false && "Copy paste error probably, should never touch this path");
                 if (c.callee) {
                     format_expr_into(out, *c.callee, Parser::kCallPrec, false);
                 } else {
