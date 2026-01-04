@@ -134,10 +134,11 @@ public:
     static constexpr int kUnaryPrec = 80;
     static constexpr int kCallPrec = 90;
 
-    [[nodiscard]] Statement parse_statement();
-    [[nodiscard]] std::vector<Statement> parse_scope(); // Parse statements until you see an END or EOF
     [[nodiscard]] std::vector<Statement> parse_program(); // Parse statements until you see an END or EOF
-    [[nodiscard]] IntAssignmentStatement parse_let_statement();
+
+    [[nodiscard]] Statement parse_statement();
+    [[nodiscard]] std::vector<Statement> parse_scope(); // Scope == { ... }
+    [[nodiscard]] IntAssignmentStatement parse_int_assignment_statement();
     [[nodiscard]] PrintStatement parse_print_statement();
     [[nodiscard]] ReturnStatement parse_return_statement();
     [[nodiscard]] ScopeStatement parse_scope_statement();
@@ -157,6 +158,7 @@ private:
     [[nodiscard]] const Token &advance();
     [[nodiscard]] bool match(TokenKind k);
     [[nodiscard]] const Token &consume(TokenKind kind, std::string_view msg);
+
 
     void skip_eos();
 

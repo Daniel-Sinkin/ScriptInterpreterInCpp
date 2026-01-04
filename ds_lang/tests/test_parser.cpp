@@ -62,7 +62,7 @@ static void test_int_assignment() {
     const auto &ie = expect_expr_is<IntegerExpression>(e);
     EXPECT_EQ(ie.value, static_cast<i64>(123));
 
-    EXPECT_EQ(std::format("{}", statements[0]), "int x = 123");
+    EXPECT_EQ(std::format("{}", statements[0]), "int x = 123;");
 }
 
 static void test_expression_precedence_mul_over_add() {
@@ -86,7 +86,7 @@ static void test_expression_precedence_mul_over_add() {
     EXPECT_EQ(expect_expr_is<IntegerExpression>(expect_expr_ptr(mul.lhs)).value, static_cast<i64>(2));
     EXPECT_EQ(expect_expr_is<IntegerExpression>(expect_expr_ptr(mul.rhs)).value, static_cast<i64>(3));
 
-    EXPECT_EQ(std::format("{}", statements[0]), "print 1 + 2 * 3");
+    EXPECT_EQ(std::format("{}", statements[0]), "print 1 + 2 * 3;");
 }
 
 static void test_left_associative_minus() {
@@ -109,7 +109,7 @@ static void test_left_associative_minus() {
     EXPECT_EQ(expect_expr_is<IntegerExpression>(expect_expr_ptr(sub0.lhs)).value, static_cast<i64>(10));
     EXPECT_EQ(expect_expr_is<IntegerExpression>(expect_expr_ptr(sub0.rhs)).value, static_cast<i64>(3));
 
-    EXPECT_EQ(std::format("{}", statements[0]), "print 10 - 3 - 2");
+    EXPECT_EQ(std::format("{}", statements[0]), "print 10 - 3 - 2;");
 }
 
 static void test_parentheses_override_precedence() {
@@ -132,7 +132,7 @@ static void test_parentheses_override_precedence() {
     EXPECT_EQ(expect_expr_is<IntegerExpression>(expect_expr_ptr(add.lhs)).value, static_cast<i64>(1));
     EXPECT_EQ(expect_expr_is<IntegerExpression>(expect_expr_ptr(add.rhs)).value, static_cast<i64>(2));
 
-    EXPECT_EQ(std::format("{}", statements[0]), "print (1 + 2) * 3");
+    EXPECT_EQ(std::format("{}", statements[0]), "print (1 + 2) * 3;");
 }
 
 static void test_unary_binds_tighter_than_infix() {
@@ -156,7 +156,7 @@ static void test_unary_binds_tighter_than_infix() {
     const auto &add = expect_expr_is<BinaryExpression>(inner);
     EXPECT_EQ(add.op, BinaryOp::Add);
 
-    EXPECT_EQ(std::format("{}", statements[0]), "print -(1 + 2) * 3");
+    EXPECT_EQ(std::format("{}", statements[0]), "print -(1 + 2) * 3;");
 }
 
 static void test_call_expression_and_args() {
@@ -179,7 +179,7 @@ static void test_call_expression_and_args() {
     const auto &add = expect_expr_is<BinaryExpression>(arg1);
     EXPECT_EQ(add.op, BinaryOp::Add);
 
-    EXPECT_EQ(std::format("{}", statements[0]), "print foo(1, 2 + 3)");
+    EXPECT_EQ(std::format("{}", statements[0]), "print foo(1, 2 + 3);");
 }
 
 static void test_if_else_statement_structure() {
@@ -296,10 +296,15 @@ static void test_parenthesized_identifier_callable() {
 
 static void test_scope_statement_formatting() {
     auto inner = parse_block("int x = 1; print x;");
+    for(const auto& statement: inner) {
+        std::println("{}", statement);
+    }
     Statement s;
     s.node = ScopeStatement{.scope = std::move(inner)};
 
-    EXPECT_EQ(std::format("{}", s), "{\n    int x = 1;\n    print x\n}");
+    auto real = std::format("{}", s);
+    std::println("{}", real);
+    EXPECT_EQ(real, "{\n    int x = 1;\n    print x;\n}");
 }
 
 static void test_missing_expression_throws() {

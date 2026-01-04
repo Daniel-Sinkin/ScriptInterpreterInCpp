@@ -184,7 +184,7 @@ static void format_scope_into(std::string& out, const std::vector<Statement>& sc
         append_indent(out, indent);
         format_statement_into(out, scope[i], indent);
         if (i + 1 < scope.size()) {
-            out += ";\n";
+            out += "\n";
         }
     }
 }
@@ -197,14 +197,17 @@ static void format_statement_into(std::string& out, const Statement& s, int inde
                 out += st.identifier;
                 out += " = ";
                 out += st.expr ? format_expression(*st.expr) : "<null-expr>";
+                out += ";";
             },
             [&](const PrintStatement& st) {
                 out += "print ";
                 out += st.expr ? format_expression(*st.expr) : "<null-expr>";
+                out += ";";
             },
             [&](const ReturnStatement& st) {
                 out += "return ";
                 out += st.expr ? format_expression(*st.expr) : "<null-expr>";
+                out += ";";
             },
             [&](const ScopeStatement& st) {
                 out += "{\n";

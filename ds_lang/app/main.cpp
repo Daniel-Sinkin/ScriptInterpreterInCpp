@@ -81,7 +81,7 @@ static void print_function_code(const ds_lang::FunctionBytecode &fn, ds_lang::u3
     }
 }
 
-int main() {
+void bytecode_example() {
     using namespace ds_lang;
 
     const FunctionBytecode f_main = build_function_main();
@@ -103,4 +103,14 @@ int main() {
 
     std::println("VM stack: {}", vm.stack());
     std::println("VM prints: {}", vm.print_buffer());
+}
+
+int main() {
+    using namespace ds_lang;
+    std::string code = "int x = 5;";
+    std::vector<Statement> statements = Parser{Lexer{code}.tokenize_all()}.parse_program();
+
+    for(const Statement& statement : statements) {
+        std::println("{}", statement);
+    }
 }

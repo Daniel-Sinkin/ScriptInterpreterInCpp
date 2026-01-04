@@ -276,7 +276,7 @@ Statement Parser::parse_statement() {
     }
     TokenKind k = peek().kind;
     if (k == TokenKind::KWInt) {
-        return {parse_let_statement()};
+        return {parse_int_assignment_statement()};
     } else if (k == TokenKind::KWPrint) {
         return {parse_print_statement()};
     } else if (k == TokenKind::KWFunc) {
@@ -327,7 +327,7 @@ std::vector<Statement> Parser::parse_scope()
     return statements;
 }
 
-IntAssignmentStatement Parser::parse_let_statement() {
+IntAssignmentStatement Parser::parse_int_assignment_statement() {
     (void)consume(TokenKind::KWInt, "Expected 'LET' at start of assignment statement");
 
     const Token &id = consume(TokenKind::Identifier, "Expected identifier after 'int'");
