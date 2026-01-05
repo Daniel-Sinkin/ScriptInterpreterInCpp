@@ -6,6 +6,7 @@
 #include <stdexcept>
 #include <utility>
 
+#include "types.hpp"
 #include "util.hpp"
 
 namespace ds_lang {
@@ -253,17 +254,26 @@ void VirtualMachine::exec_op(const BytecodeOperation& op) {
                 fr.locals[static_cast<usize>(o.slot)] = pop();
             },
 
-            [&](const BytecodeJmp& o) { fr.ip = static_cast<usize>(o.target_ip); },
+            [&](const BytecodeJmp& o) {
+                if(o.target_ip == INVALIDIPtr) {
+                    throw std::runtime_error("Unset IP in jump");
+                }
+                fr.ip = o.target_ip;
+            },
             [&](const BytecodeJmpFalse& o) {
-                const i64 cond = pop();
-                if (!truthy(cond)) {
-                    fr.ip = static_cast<usize>(o.target_ip);
+                if(o.target_ip == INVALIDIPtr) {
+                    throw std::runtime_error("Unset IP in jump");
+                }
+                if (!truthy(pop())) {
+                    fr.ip = o.target_ip;
                 }
             },
             [&](const BytecodeJmpTrue& o) {
-                const i64 cond = pop();
-                if (truthy(cond)) {
-                    fr.ip = static_cast<usize>(o.target_ip);
+                if(o.target_ip == INVALIDIPtr) {
+                    throw std::runtime_error("Unset IP in jump");
+                }
+                if (truthy(pop())) {
+                    fr.ip = o.target_ip;
                 }
             },
 

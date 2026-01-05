@@ -1,11 +1,11 @@
 // ds_lang/include/parser.hpp
 #pragma once
 
+#include <memory>
 #include <string>
 #include <string_view>
 #include <variant>
 #include <vector>
-#include <memory>
 
 #include "formatters.hpp" // IWYU pragma: keep
 #include "token.hpp"
@@ -76,7 +76,12 @@ struct Expression {
 
 struct Statement;
 
-struct IntAssignmentStatement {
+struct IntDeclarationStatement { // int x = 1;
+    std::string identifier;
+    std::unique_ptr<Expression> expr;
+};
+
+struct IntAssignmentStatement { // x = 1; // after int x = (...) as been executed before
     std::string identifier;
     std::unique_ptr<Expression> expr;
 };
@@ -112,6 +117,7 @@ struct FunctionStatement {
 
 struct Statement {
     using Variant = std::variant<
+        IntDeclarationStatement,
         IntAssignmentStatement,
         PrintStatement,
         ReturnStatement,
@@ -138,6 +144,7 @@ public:
 
     [[nodiscard]] Statement parse_statement();
     [[nodiscard]] std::vector<Statement> parse_scope(); // Scope == { ... }
+    [[nodiscard]] IntDeclarationStatement parse_int_declaration_statement();
     [[nodiscard]] IntAssignmentStatement parse_int_assignment_statement();
     [[nodiscard]] PrintStatement parse_print_statement();
     [[nodiscard]] ReturnStatement parse_return_statement();
@@ -153,12 +160,12 @@ private:
     [[nodiscard]] std::unique_ptr<Expression> parse_expression();
 
     [[nodiscard]] bool at_end() const noexcept;
-    [[nodiscard]] const Token &peek() const;
+    [[nodiscard]] const Token &peek(usize offset = 0) const;
+    [[nodiscard]] TokenKind peek_kind(usize offset) const;
     [[nodiscard]] const Token &previous() const;
     [[nodiscard]] const Token &advance();
     [[nodiscard]] bool match(TokenKind k);
     [[nodiscard]] const Token &consume(TokenKind kind, std::string_view msg);
-
 
     void skip_eos();
 

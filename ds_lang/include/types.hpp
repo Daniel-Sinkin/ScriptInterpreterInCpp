@@ -4,6 +4,7 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 
 namespace ds_lang {
 using u8 = std::uint8_t;
@@ -18,6 +19,9 @@ using i64 = std::int64_t;
 
 using usize = std::size_t;
 using isize = std::ptrdiff_t;
+
+using IPtr = usize; // Instruction Pointer
+constexpr usize INVALIDIPtr = std::numeric_limits<IPtr>::max();
 
 #if defined(__cpp_lib_stdfloat)
 using f32 = std::float32_t;

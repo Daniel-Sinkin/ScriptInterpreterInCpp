@@ -6,6 +6,7 @@
 #include "formatters.hpp"
 #include "lexer.hpp"
 #include "parser.hpp"
+#include "util.hpp"
 #include "vm.hpp"
 
 static ds_lang::FunctionBytecode build_function_square() {
@@ -105,7 +106,8 @@ void bytecode_example() {
 
 int main() {
     using namespace ds_lang;
-    std::string code = "return (1 + 2);";
+    std::string code = load_code("examples/simple.ds");
+
     std::vector<Token> tokens = Lexer{code}.tokenize_all();
     std::vector<Statement> statements = Parser{tokens}.parse_program();
 
@@ -113,22 +115,23 @@ int main() {
     for(const Token& token: tokens) {
         std::println("{}", token);
     };
-    std::println("");
+    std::println();
 
     std::println("Statements:");
-    for(const Statement& statement : statements) {
-        std::println("{}", statement);
+    for(usize i = 0; i < statements.size(); ++i) {
+        std::println("[{:03}] {}", i, statements[i]);
     };
-    std::println("");
-    
+    std::println();
 
     BytecodeBuilder builder{};
-    builder.build_statement(statements[0]);
+    builder.build(statements);
 
-    FunctionBytecode f;
-    f.num_locals = 0;
-    f.num_params = 0;
-    f.code = std::move(builder.code_);
+    FunctionBytecode f = builder.func_code();
+    std::println("Bytecode:");
+    for (usize i = 0; i < f.code.size(); ++i) {
+        std::println("[{:03}] {}", i, f.code[i]);
+    }
+    std::println();
 
     VirtualMachine vm{true};
     (void)vm.add_function(f);

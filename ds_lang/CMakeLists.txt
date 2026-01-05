@@ -115,6 +115,7 @@ target_link_libraries(ds_lang_parser_tests PRIVATE ds_lang ds_lang_warnings)
 target_compile_features(ds_lang_parser_tests PRIVATE cxx_std_23)
 
 set(PARSER_TEST_CASES
+    int_declaration
     int_assignment
     expression_precedence_mul_over_add
     left_associative_minus

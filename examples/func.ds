@@ -20,5 +20,3 @@ func my_func(x) {
     }
     return y;
 }
-
-print main(my_func(2));

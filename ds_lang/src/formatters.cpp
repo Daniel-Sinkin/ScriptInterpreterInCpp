@@ -109,8 +109,7 @@ static void format_expr_into(std::string& out, const Expression& e, int parent_p
             },
             [&](const BinaryExpression& b) -> void {
                 const int my_prec = precedence(b.op);
-                const bool need_parens =
-                    (my_prec < parent_prec) || (is_rhs && my_prec == parent_prec);
+                const bool need_parens = (my_prec < parent_prec) || (is_rhs && my_prec == parent_prec);
 
                 if (need_parens) {
                     out += "(";
@@ -192,8 +191,14 @@ static void format_scope_into(std::string& out, const std::vector<Statement>& sc
 static void format_statement_into(std::string& out, const Statement& s, int indent) {
     std::visit(
         ds_lang::overloaded{
-            [&](const IntAssignmentStatement& st) {
+            [&](const IntDeclarationStatement& st) {
                 out += "int ";
+                out += st.identifier;
+                out += " = ";
+                out += st.expr ? format_expression(*st.expr) : "<null-expr>";
+                out += ";";
+            },
+            [&](const IntAssignmentStatement& st) {
                 out += st.identifier;
                 out += " = ";
                 out += st.expr ? format_expression(*st.expr) : "<null-expr>";

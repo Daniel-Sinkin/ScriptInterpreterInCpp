@@ -60,7 +60,7 @@ constexpr std::string_view to_string(TokenKind k) noexcept {
         return "Integer";
 
     case TokenKind::KWInt:
-        return "KWLet";
+        return "KWInt";
     case TokenKind::KWPrint:
         return "KWPrint";
     case TokenKind::KWFunc:

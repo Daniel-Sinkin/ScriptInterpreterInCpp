@@ -18,8 +18,18 @@ bool Parser::at_end() const noexcept {
     return pos_ >= tokens_.size();
 }
 
-const Token &Parser::peek() const {
-    return tokens_[pos_];
+const Token &Parser::peek(usize offset) const {
+    if (pos_ + offset >= tokens_.size()) {
+        error_here("Trying to peek after EOF");
+    }
+    return tokens_[pos_ + offset];
+}
+
+TokenKind Parser::peek_kind(usize offset) const {
+    if(pos_ + offset >= tokens_.size()) {
+        return TokenKind::Eof;
+    }
+    return tokens_[pos_ + offset].kind;
 }
 
 const Token &Parser::previous() const {
@@ -274,9 +284,12 @@ Statement Parser::parse_statement() {
     if (at_end()) {
         throw std::runtime_error("Trying to parse statement at the end");
     }
+
+
+
     TokenKind k = peek().kind;
     if (k == TokenKind::KWInt) {
-        return {parse_int_assignment_statement()};
+        return {parse_int_declaration_statement()};
     } else if (k == TokenKind::KWPrint) {
         return {parse_print_statement()};
     } else if (k == TokenKind::KWFunc) {
@@ -289,6 +302,8 @@ Statement Parser::parse_statement() {
         return {parse_while_statement()};
     } else if (k == TokenKind::LBrace) {
         return {parse_scope_statement()};
+    } else if (k == TokenKind::Identifier && peek_kind(1) == TokenKind::OpAssign) {
+        return {parse_int_assignment_statement()};
     } else {
         error_here("Peeked TokenKind can't be a start of a statement scope");
     }
@@ -327,21 +342,31 @@ std::vector<Statement> Parser::parse_scope()
     return statements;
 }
 
-IntAssignmentStatement Parser::parse_int_assignment_statement() {
-    (void)consume(TokenKind::KWInt, "Expected 'LET' at start of assignment statement");
+IntDeclarationStatement Parser::parse_int_declaration_statement() {
+    (void)consume(TokenKind::KWInt, "Expected 'int' at start of declaration statement");
 
     const Token &id = consume(TokenKind::Identifier, "Expected identifier after 'int'");
-    (void)consume(TokenKind::OpAssign, "Expected '=' after identifier in IntAssignment statement");
+    (void)consume(TokenKind::OpAssign, "Expected '=' after identifier in IntDeclarationStatement");
 
     auto rhs = parse_expr_bp(0);
 
     while (match(TokenKind::Eos)) {
     }
+    return IntDeclarationStatement{.identifier = std::string(id.lexeme), .expr = std::move(rhs)};
+}
+
+IntAssignmentStatement Parser::parse_int_assignment_statement() {
+    const Token &id = consume(TokenKind::Identifier, "Expected identifier after 'int'");
+    (void)consume(TokenKind::OpAssign, "Expected '=' after identifier in IntAssignmentStatement");
+    auto rhs = parse_expr_bp(0);
+    while (match(TokenKind::Eos)) {
+    }
     return IntAssignmentStatement{.identifier = std::string(id.lexeme), .expr = std::move(rhs)};
 }
 
+
 PrintStatement Parser::parse_print_statement() {
-    (void)consume(TokenKind::KWPrint, "Expected 'PRINT' at start of assignment statement");
+    (void)consume(TokenKind::KWPrint, "Expected 'PRINT' at start of PrintStatement");
     auto rhs = parse_expr_bp(0);
     while (match(TokenKind::Eos)) {
     }

@@ -1,4 +1,4 @@
-// tests/test_parser.cpp
+// ds_lang/tests/test_parser.cpp
 #include "common.hpp"
 
 #include <format>
@@ -51,8 +51,23 @@ static const T &expect_expr_is(const Expression &e) {
 // Parser test cases
 // ----------------------------------------------------------------------------
 
-static void test_int_assignment() {
+static void test_int_declaration() {
     const auto statements = parse_block("int x = 123;");
+    EXPECT_EQ(statements.size(), static_cast<std::size_t>(1));
+
+    const auto &st = expect_stmt_is<IntDeclarationStatement>(statements[0]);
+    EXPECT_EQ(st.identifier, "x");
+
+    const auto &e = expect_expr_ptr(st.expr);
+    const auto &ie = expect_expr_is<IntegerExpression>(e);
+    EXPECT_EQ(ie.value, static_cast<i64>(123));
+
+    EXPECT_EQ(std::format("{}", statements[0]), "int x = 123;");
+}
+
+static void test_int_assignment() {
+    // assignment statements are identifier-led: x = 123;
+    const auto statements = parse_block("x = 123;");
     EXPECT_EQ(statements.size(), static_cast<std::size_t>(1));
 
     const auto &st = expect_stmt_is<IntAssignmentStatement>(statements[0]);
@@ -62,7 +77,7 @@ static void test_int_assignment() {
     const auto &ie = expect_expr_is<IntegerExpression>(e);
     EXPECT_EQ(ie.value, static_cast<i64>(123));
 
-    EXPECT_EQ(std::format("{}", statements[0]), "int x = 123;");
+    EXPECT_EQ(std::format("{}", statements[0]), "x = 123;");
 }
 
 static void test_expression_precedence_mul_over_add() {
@@ -268,7 +283,7 @@ static void test_skip_extra_eos_inside_scope() {
     const auto statements = parse_block(";;;int x = 1;;;;print x;;;");
     EXPECT_EQ(statements.size(), static_cast<std::size_t>(2));
 
-    (void)expect_stmt_is<IntAssignmentStatement>(statements[0]);
+    (void)expect_stmt_is<IntDeclarationStatement>(statements[0]);
     (void)expect_stmt_is<PrintStatement>(statements[1]);
 }
 
@@ -296,14 +311,10 @@ static void test_parenthesized_identifier_callable() {
 
 static void test_scope_statement_formatting() {
     auto inner = parse_block("int x = 1; print x;");
-    for(const auto& statement: inner) {
-        std::println("{}", statement);
-    }
     Statement s;
     s.node = ScopeStatement{.scope = std::move(inner)};
 
     auto real = std::format("{}", s);
-    std::println("{}", real);
     EXPECT_EQ(real, "{\n    int x = 1;\n    print x;\n}");
 }
 
@@ -326,6 +337,7 @@ int main(int argc, char **argv) {
     };
 
     const TestCase tests[] = {
+        {"int_declaration", test_int_declaration},
         {"int_assignment", test_int_assignment},
         {"expression_precedence_mul_over_add", test_expression_precedence_mul_over_add},
         {"left_associative_minus", test_left_associative_minus},
