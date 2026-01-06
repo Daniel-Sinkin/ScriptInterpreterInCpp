@@ -1,4 +1,3 @@
-# ds_lang/CMakeLists.txt
 cmake_minimum_required(VERSION 3.23)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -34,7 +33,6 @@ else()
     endif()
 endif()
 
-# Suppress libc++ header warnings on AppleClang/Clang (applies to all targets)
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     target_compile_options(ds_lang_warnings INTERFACE
         -Wno-reserved-user-defined-literal
@@ -51,14 +49,7 @@ target_compile_features(ds_lang_cli PRIVATE cxx_std_23)
 
 enable_testing()
 
-add_executable(ds_lang_tests
-    tests/test_lexer.cpp
-)
-
-target_include_directories(ds_lang_tests PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/tests
-)
-
+add_executable(ds_lang_tests tests/test_lexer.cpp)
 target_link_libraries(ds_lang_tests PRIVATE ds_lang ds_lang_warnings)
 target_compile_features(ds_lang_tests PRIVATE cxx_std_23)
 
@@ -70,6 +61,9 @@ set(LEXER_TEST_CASES
     starts_with_zero_throws
     overflow_throws
     eof_only_once_and_at_end
+    string_literal
+    unterminated_string_throws
+    string_contains_semicolon_throws
 )
 
 foreach(tc IN LISTS LEXER_TEST_CASES)
@@ -77,14 +71,10 @@ foreach(tc IN LISTS LEXER_TEST_CASES)
              COMMAND ds_lang_tests --case ${tc})
 endforeach()
 
-add_executable(ds_lang_util_tests
-    tests/test_util.cpp
-)
-
-target_include_directories(ds_lang_util_tests PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/tests
-)
-
+# -----------------------
+# Util tests
+# -----------------------
+add_executable(ds_lang_util_tests tests/test_util.cpp)
 target_link_libraries(ds_lang_util_tests PRIVATE ds_lang ds_lang_warnings)
 target_compile_features(ds_lang_util_tests PRIVATE cxx_std_23)
 
@@ -103,20 +93,14 @@ foreach(tc IN LISTS UTIL_TEST_CASES)
              COMMAND ds_lang_util_tests --case ${tc})
 endforeach()
 
-add_executable(ds_lang_parser_tests
-    tests/test_parser.cpp
-)
-
-target_include_directories(ds_lang_parser_tests PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/tests
-)
-
+add_executable(ds_lang_parser_tests tests/test_parser.cpp)
 target_link_libraries(ds_lang_parser_tests PRIVATE ds_lang ds_lang_warnings)
 target_compile_features(ds_lang_parser_tests PRIVATE cxx_std_23)
 
 set(PARSER_TEST_CASES
     int_declaration
     int_assignment
+    print_string_statement
     expression_precedence_mul_over_add
     left_associative_minus
     parentheses_override_precedence
@@ -141,14 +125,7 @@ foreach(tc IN LISTS PARSER_TEST_CASES)
              COMMAND ds_lang_parser_tests --case ${tc})
 endforeach()
 
-add_executable(ds_lang_vm_tests
-    tests/test_vm.cpp
-)
-
-target_include_directories(ds_lang_vm_tests PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/tests
-)
-
+add_executable(ds_lang_vm_tests tests/test_vm.cpp)
 target_link_libraries(ds_lang_vm_tests PRIVATE ds_lang ds_lang_warnings)
 target_compile_features(ds_lang_vm_tests PRIVATE cxx_std_23)
 
@@ -165,10 +142,39 @@ set(VM_TEST_CASES
     call_and_return_with_args
     nested_calls
     print_records_value
+    print_string_records_value
     step_past_end_throws
 )
 
 foreach(tc IN LISTS VM_TEST_CASES)
     add_test(NAME vm.${tc}
              COMMAND ds_lang_vm_tests --case ${tc})
+endforeach()
+
+add_executable(ds_lang_bytecode_builder_tests
+    tests/test_bytecode_builder.cpp
+)
+
+target_link_libraries(ds_lang_bytecode_builder_tests PRIVATE ds_lang ds_lang_warnings)
+target_compile_features(ds_lang_bytecode_builder_tests PRIVATE cxx_std_23)
+
+set(BYTECODE_BUILDER_TEST_CASES
+    entry_function_is_main_even_if_not_first
+    implicit_return_added
+    print_string_emits_printstring
+    locals_scoping_and_shadowing
+    if_else_patches_jumps
+    while_loop_runs
+    short_circuit_avoids_div0
+    function_call_and_args
+    missing_main_throws
+    top_level_non_function_throws
+    undefined_variable_throws
+    undefined_function_throws
+    duplicate_function_throws
+)
+
+foreach(tc IN LISTS BYTECODE_BUILDER_TEST_CASES)
+    add_test(NAME bytecode_builder.${tc}
+             COMMAND ds_lang_bytecode_builder_tests --case ${tc})
 endforeach()

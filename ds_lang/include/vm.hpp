@@ -32,7 +32,7 @@ public:
     void run();
 
     [[nodiscard]] const std::vector<i64> &stack() const noexcept { return stack_; }
-    [[nodiscard]] const std::vector<i64> &print_buffer() const noexcept { return print_buffer_; }
+    [[nodiscard]] const std::vector<std::string> &print_buffer() const noexcept { return print_buffer_; }
 
     i64 get_return_value() {
         return *return_value_;
@@ -46,7 +46,7 @@ private:
     };
 
     std::vector<i64> stack_{};
-    std::vector<i64> print_buffer_{};
+    std::vector<std::string> print_buffer_{};
     std::vector<FunctionBytecode> functions_{};
 
     std::optional<usize> entry_func_{std::nullopt};

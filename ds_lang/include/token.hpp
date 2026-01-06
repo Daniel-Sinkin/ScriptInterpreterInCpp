@@ -8,6 +8,7 @@ namespace ds_lang {
 enum class TokenKind {
     Identifier, // variable / function name
     Integer,    // integer literal
+    String,     // string literal, must not contain "
 
     KWInt,      // int
     KWPrint,    // print
@@ -58,6 +59,8 @@ constexpr std::string_view to_string(TokenKind k) noexcept {
         return "Identifier";
     case TokenKind::Integer:
         return "Integer";
+    case TokenKind::String:
+        return "String";
 
     case TokenKind::KWInt:
         return "KWInt";
@@ -134,6 +137,8 @@ constexpr std::string_view explain(TokenKind k) noexcept {
         return "A user-defined name (variable or function identifier).";
     case TokenKind::Integer:
         return "A base-10 integer literal.";
+    case TokenKind::String:
+        return "A string literal. Must not contain \".";
 
     case TokenKind::KWInt:
         return "Keyword introducing a variable definition or assignment.";
@@ -151,50 +156,50 @@ constexpr std::string_view explain(TokenKind k) noexcept {
         return "Keyword starting a while loop.";
 
     case TokenKind::LParen:
-        return "Left parenthesis “(”.";
+        return "Left parenthesis '('.";
     case TokenKind::RParen:
-        return "Right parenthesis “)”.";
+        return "Right parenthesis ')'.";
     case TokenKind::LBrace:
-        return "Left Brace “{”.";
+        return "Left Brace '{'.";
     case TokenKind::RBrace:
-        return "Left Brace “}”.";
+        return "Left Brace '}'.";
     case TokenKind::LBracket:
-        return "Left parenthesis “[”.";
+        return "Left parenthesis '['.";
     case TokenKind::RBracket:
-        return "Right bracket “]”.";
+        return "Right bracket ']'.";
     case TokenKind::Comma:
-        return "Comma “,” separator.";
+        return "Comma ',' separator.";
 
     case TokenKind::OpAssign:
-        return "Assignment operator “=”.";
+        return "Assignment operator '='.";
     case TokenKind::OpPlus:
-        return "Addition operator “+”.";
+        return "Addition operator '+'.";
     case TokenKind::OpMinus:
-        return "Subtraction operator “-”.";
+        return "Subtraction operator '-'.";
     case TokenKind::OpStar:
-        return "Multiplication operator “*”.";
+        return "Multiplication operator '*'.";
     case TokenKind::OpSlash:
-        return "Division operator “/”.";
+        return "Division operator '/'.";
     case TokenKind::OpPercent:
-        return "Modulo operator “%”.";
+        return "Modulo operator '%'.";
     case TokenKind::OpEqEq:
-        return "Equality comparison operator “==”.";
+        return "Equality comparison operator '=='.";
     case TokenKind::OpNeq:
-        return "Inequality comparison operator “!=”.";
+        return "Inequality comparison operator '!='.";
     case TokenKind::OpLt:
-        return "Less-than comparison operator “<”.";
+        return "Less-than comparison operator '<'.";
     case TokenKind::OpLe:
-        return "Less-than-or-equal comparison operator “<=”.";
+        return "Less-than-or-equal comparison operator '<='.";
     case TokenKind::OpGt:
-        return "Greater-than comparison operator “>”.";
+        return "Greater-than comparison operator '>'.";
     case TokenKind::OpGe:
-        return "Greater-than-or-equal comparison operator “>=”.";
+        return "Greater-than-or-equal comparison operator '>='.";
     case TokenKind::OpAndAnd:
-        return "Logical AND operator “&&”.";
+        return "Logical AND operator '&&'.";
     case TokenKind::OpOrOr:
-        return "Logical OR operator “||”.";
+        return "Logical OR operator '||'.";
     case TokenKind::OpBang:
-        return "Logical NOT operator “!”.";
+        return "Logical NOT operator '!'.";
 
     case TokenKind::Eos:
         return "';' token that terminates a statement.";
@@ -215,12 +220,35 @@ struct std::formatter<ds_lang::TokenKind> : std::formatter<std::string_view> {
 
 template <>
 struct std::formatter<ds_lang::Token> : std::formatter<std::string_view> {
+    static std::string escape_for_source(std::string_view s) {
+        std::string out;
+        out.reserve(s.size());
+        for (char c : s) {
+            switch (c) {
+            case '\\': out += "\\\\"; break;
+            case '\n': out += "\\n"; break;
+            case '\r': out += "\\r"; break;
+            case '\t': out += "\\t"; break;
+            case '"':  out += "\\\""; break;
+            default:   out += c; break;
+            }
+        }
+        return out;
+    }
+
     auto format(const ds_lang::Token &t, format_context &ctx) const {
+        std::string lex;
+        if (t.kind == ds_lang::TokenKind::String) {
+            lex = std::format("\"{}\"", escape_for_source(t.lexeme));
+        } else {
+            lex = std::format("{:?}", t.lexeme);
+        }
+
         return std::format_to(
             ctx.out(),
-            "Token{{kind={}, lexeme={:?}, line={}, column={}}}",
+            "Token{{kind={}, lexeme={}, line={}, column={}}}",
             t.kind,
-            t.lexeme,
+            lex,
             t.line,
             t.column);
     }

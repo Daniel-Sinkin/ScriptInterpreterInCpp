@@ -289,9 +289,15 @@ void VirtualMachine::exec_op(const BytecodeOperation& op) {
                     throw std::runtime_error("VM: PRINT requires a value on stack");
                 }
                 const i64 v = stack_.back();
-                print_buffer_.push_back(v);
+                print_buffer_.push_back(std::to_string(v));
                 if (immediate_print_) {
                     std::println("VM Print: [{}]", v);
+                }
+            },
+            [&](const BytecodePrintString& o) {
+                print_buffer_.push_back(o.content);
+                if (immediate_print_) {
+                    std::println("VM PrintString: [{}]", o.content);
                 }
             },
         },

@@ -90,6 +90,10 @@ struct PrintStatement {
     std::unique_ptr<Expression> expr;
 };
 
+struct PrintStringStatement {
+    std::string content;
+};
+
 struct ReturnStatement {
     std::unique_ptr<Expression> expr;
 };
@@ -120,6 +124,7 @@ struct Statement {
         IntDeclarationStatement,
         IntAssignmentStatement,
         PrintStatement,
+        PrintStringStatement,
         ReturnStatement,
         IfStatement,
         WhileStatement,
@@ -147,6 +152,7 @@ public:
     [[nodiscard]] IntDeclarationStatement parse_int_declaration_statement();
     [[nodiscard]] IntAssignmentStatement parse_int_assignment_statement();
     [[nodiscard]] PrintStatement parse_print_statement();
+    [[nodiscard]] PrintStringStatement parse_print_string_statement();
     [[nodiscard]] ReturnStatement parse_return_statement();
     [[nodiscard]] ScopeStatement parse_scope_statement();
     [[nodiscard]] IfStatement parse_if_statement();

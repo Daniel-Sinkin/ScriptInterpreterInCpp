@@ -134,6 +134,37 @@ std::vector<Token> Lexer::tokenize_range(usize left, usize right) const {
         const int tok_line = line;
         const int tok_col = col;
 
+        if(code_[pos] == '"') {
+            new_char();
+            const usize content_start = pos;
+            while(true) {
+                if(pos >= right) {
+                    throw std::runtime_error(std::format(
+                        "Unterminated string literal (line={},column={})",
+                        tok_line, tok_col));
+                }
+                const char c = code_[pos];
+                if(c == '\n' || c == '\r') {
+                    throw std::runtime_error(std::format(
+                        "Unterminated string literal before newline (line={},column={})",
+                        tok_line, tok_col));
+                }
+                if (c == '"') {
+                    break;
+                }
+                if (is_eos(c)) { // TODO: Maybe allos ; in strings, not sure yet
+                    throw std::runtime_error(std::format(
+                        "Unterminated string literal before ';' (line={},column={})",
+                        tok_line, tok_col));
+                }
+                new_char();
+            }
+            const usize content_len = pos - content_start;
+            emit(TokenKind::String, content_start, content_len, tok_line, tok_col);
+            new_char();
+            continue;
+        }
+
         if (pos + 1 < right) {
             const char a = code_[pos];
             const char b = code_[pos + 1];

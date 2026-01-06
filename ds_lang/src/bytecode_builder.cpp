@@ -6,6 +6,8 @@
 #include <string>
 #include <utility>
 
+#include "bytecode.hpp"
+#include "parser.hpp"
 #include "util.hpp"
 
 namespace ds_lang {
@@ -237,6 +239,9 @@ void BytecodeBuilder::build_statement(const Statement& st) {
                 build_expression(*s.expr);
                 emit(BytecodePrint{});
                 emit(BytecodePop{});
+            },
+            [&](const PrintStringStatement& s) {
+                emit(BytecodePrintString{s.content});
             },
             [&](const ReturnStatement& s) {
                 if (!s.expr) throw std::runtime_error("ReturnStatement missing expr");

@@ -46,7 +46,9 @@ static void test_push_and_pop() {
     EXPECT_TRUE(!vm.is_active());
     EXPECT_EQ(vm.print_buffer().size(), static_cast<std::size_t>(0));
 
-    EXPECT_EQ(vm.stack().size(), static_cast<std::size_t>(1));
+    // RETURN pops the return value and halts the VM (no caller frame),
+    // so stack should be empty afterwards.
+    EXPECT_EQ(vm.stack().size(), static_cast<std::size_t>(0));
 }
 
 static void test_arithmetic_ops() {
@@ -61,7 +63,7 @@ static void test_arithmetic_ops() {
         BytecodeMult{},     // 90
         BytecodePushI64{5},
         BytecodeSub{},      // 85
-        BytecodePrint{},    // prints 85
+        BytecodePrint{},    // prints 85 (does not pop)
         BytecodePop{},      // drop 85
         BytecodePushI64{0}, // return value
         BytecodeReturn{},
@@ -70,7 +72,7 @@ static void test_arithmetic_ops() {
     vm.run();
 
     EXPECT_EQ(vm.print_buffer().size(), static_cast<std::size_t>(1));
-    EXPECT_EQ(vm.print_buffer()[0], static_cast<i64>(85));
+    EXPECT_EQ(vm.print_buffer()[0], "85");
 }
 
 static void test_div0_throws() {
@@ -134,9 +136,9 @@ static void test_comparison_ops() {
     vm.run();
 
     EXPECT_EQ(vm.print_buffer().size(), static_cast<std::size_t>(3));
-    EXPECT_EQ(vm.print_buffer()[0], static_cast<i64>(1));
-    EXPECT_EQ(vm.print_buffer()[1], static_cast<i64>(1));
-    EXPECT_EQ(vm.print_buffer()[2], static_cast<i64>(1));
+    EXPECT_EQ(vm.print_buffer()[0], "1");
+    EXPECT_EQ(vm.print_buffer()[1], "1");
+    EXPECT_EQ(vm.print_buffer()[2], "1");
 }
 
 static void test_unary_ops() {
@@ -168,9 +170,9 @@ static void test_unary_ops() {
     vm.run();
 
     EXPECT_EQ(vm.print_buffer().size(), static_cast<std::size_t>(3));
-    EXPECT_EQ(vm.print_buffer()[0], static_cast<i64>(-5));
-    EXPECT_EQ(vm.print_buffer()[1], static_cast<i64>(1));
-    EXPECT_EQ(vm.print_buffer()[2], static_cast<i64>(0));
+    EXPECT_EQ(vm.print_buffer()[0], "-5");
+    EXPECT_EQ(vm.print_buffer()[1], "1");
+    EXPECT_EQ(vm.print_buffer()[2], "0");
 }
 
 static void test_locals_load_store() {
@@ -200,7 +202,7 @@ static void test_locals_load_store() {
     vm.run();
 
     EXPECT_EQ(vm.print_buffer().size(), static_cast<std::size_t>(1));
-    EXPECT_EQ(vm.print_buffer()[0], static_cast<i64>(12));
+    EXPECT_EQ(vm.print_buffer()[0], "12");
 }
 
 static void test_jmp_skips_code() {
@@ -224,7 +226,7 @@ static void test_jmp_skips_code() {
     vm.run();
 
     EXPECT_EQ(vm.print_buffer().size(), static_cast<std::size_t>(1));
-    EXPECT_EQ(vm.print_buffer()[0], static_cast<i64>(222));
+    EXPECT_EQ(vm.print_buffer()[0], "222");
 }
 
 static void test_jmpfalse_jmptrue() {
@@ -251,7 +253,7 @@ static void test_jmpfalse_jmptrue() {
     vm.run();
 
     EXPECT_EQ(vm.print_buffer().size(), static_cast<std::size_t>(1));
-    EXPECT_EQ(vm.print_buffer()[0], static_cast<i64>(222));
+    EXPECT_EQ(vm.print_buffer()[0], "222");
 
     // if (0) print 111 else print 222 (using JMP_FALSE)
     auto vm2 = build_single_function_vm({
@@ -274,7 +276,7 @@ static void test_jmpfalse_jmptrue() {
     vm2.run();
 
     EXPECT_EQ(vm2.print_buffer().size(), static_cast<std::size_t>(1));
-    EXPECT_EQ(vm2.print_buffer()[0], static_cast<i64>(222));
+    EXPECT_EQ(vm2.print_buffer()[0], "222");
 }
 
 static void test_call_and_return_with_args() {
@@ -316,7 +318,7 @@ static void test_call_and_return_with_args() {
     vm.run();
 
     EXPECT_EQ(vm.print_buffer().size(), static_cast<std::size_t>(1));
-    EXPECT_EQ(vm.print_buffer()[0], static_cast<i64>(12));
+    EXPECT_EQ(vm.print_buffer()[0], "12");
 }
 
 static void test_nested_calls() {
@@ -374,7 +376,7 @@ static void test_nested_calls() {
     vm.run();
 
     EXPECT_EQ(vm.print_buffer().size(), static_cast<std::size_t>(1));
-    EXPECT_EQ(vm.print_buffer()[0], static_cast<i64>(24));
+    EXPECT_EQ(vm.print_buffer()[0], "24");
 }
 
 static void test_print_records_value() {
@@ -391,7 +393,22 @@ static void test_print_records_value() {
     vm.run();
 
     EXPECT_EQ(vm.print_buffer().size(), static_cast<std::size_t>(1));
-    EXPECT_EQ(vm.print_buffer()[0], static_cast<i64>(123));
+    EXPECT_EQ(vm.print_buffer()[0], "123");
+}
+
+static void test_print_string_records_value() {
+    using namespace ds_lang;
+
+    auto vm = build_single_function_vm({
+        BytecodePrintString{"hello"},
+        BytecodePushI64{0},
+        BytecodeReturn{},
+    });
+
+    vm.run();
+
+    EXPECT_EQ(vm.print_buffer().size(), static_cast<std::size_t>(1));
+    EXPECT_EQ(vm.print_buffer()[0], "hello");
 }
 
 static void test_step_past_end_throws() {
@@ -431,6 +448,7 @@ int main(int argc, char** argv) {
         {"call_and_return_with_args", test_call_and_return_with_args},
         {"nested_calls", test_nested_calls},
         {"print_records_value", test_print_records_value},
+        {"print_string_records_value", test_print_string_records_value},
         {"step_past_end_throws", test_step_past_end_throws},
     };
 

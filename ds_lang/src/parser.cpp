@@ -1,6 +1,7 @@
 // ds_lang/src/parser.cpp
 #include <algorithm>
 #include <format>
+#include <iterator>
 #include <memory>
 #include <stdexcept>
 #include <string_view>
@@ -147,30 +148,22 @@ BinaryOp Parser::to_binary_op(TokenKind k) {
         return BinaryOp::And;
     case TokenKind::OpOrOr:
         return BinaryOp::Or;
-
     default:
-        throw std::runtime_error("TokenKind is not a binary operator");
+        throw std::runtime_error(std::format("TokenKind {} is not valid for to_binary_op.", k));
     }
 }
 
 bool Parser::is_prefix(TokenKind k) noexcept {
-    switch (k) {
-    case TokenKind::OpMinus:
-    case TokenKind::OpBang:
-        return true;
-    default:
-        return false;
-    }
+    return (k == TokenKind::OpMinus || k == TokenKind::OpBang);
 }
 
 UnaryOp Parser::to_unary_op(TokenKind k) {
-    switch (k) {
-    case TokenKind::OpMinus:
+    if(k == TokenKind::OpMinus) {
         return UnaryOp::Neg;
-    case TokenKind::OpBang:
+    } else if (k == TokenKind::OpBang) {
         return UnaryOp::Not;
-    default:
-        throw std::runtime_error("TokenKind is not a unary operator");
+    } else {
+        throw std::runtime_error(std::format("Invalid TokenKind '{}' for to_unary_op", k));
     }
 }
 
@@ -291,6 +284,9 @@ Statement Parser::parse_statement() {
     if (k == TokenKind::KWInt) {
         return {parse_int_declaration_statement()};
     } else if (k == TokenKind::KWPrint) {
+        if(peek_kind(1) == TokenKind::String) {
+            return {parse_print_string_statement()};
+        }
         return {parse_print_statement()};
     } else if (k == TokenKind::KWFunc) {
         return {parse_func_statement()};
@@ -372,6 +368,14 @@ PrintStatement Parser::parse_print_statement() {
     }
     return PrintStatement{.expr = std::move(rhs)};
 }
+
+PrintStringStatement Parser::parse_print_string_statement() {
+    (void)consume(TokenKind::KWPrint, "Expected 'print' at start of PrintStringStatement");
+    const Token& token = consume(TokenKind::String, "Expected string literal after 'print'");
+    while (match(TokenKind::Eos)) {}
+    return PrintStringStatement{ .content = std::string{token.lexeme} };
+}
+
 
 ReturnStatement Parser::parse_return_statement() {
     (void)consume(TokenKind::KWReturn, "Expected 'RETURN' at start of assignment statement");

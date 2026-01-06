@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 
+#include "ast_dot.hpp"      // <-- add
 #include "formatters.hpp"
 #include "lexer.hpp"
 #include "parser.hpp"
@@ -13,10 +14,13 @@
 int main() {
     using namespace ds_lang;
 
-    std::string code = load_code("examples/func.ds");
+    std::string code = load_code("examples/gcd.ds");
 
     std::vector<Token> tokens = Lexer{code}.tokenize_all();
     std::vector<Statement> statements = Parser{tokens}.parse_program();
+
+    // Dump AST to Graphviz DOT
+    AstDot::write_dot_file("ast.dot", statements);
 
     std::println("Tokens:");
     for (const Token& token : tokens) {

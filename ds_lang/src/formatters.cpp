@@ -13,6 +13,22 @@
 
 namespace ds_lang::Fmt {
 
+static std::string escape_for_source(std::string_view s) {
+    std::string out;
+    out.reserve(s.size());
+    for (char c : s) {
+        switch (c) {
+        case '\\': out += "\\\\"; break;
+        case '\n': out += "\\n"; break;
+        case '\r': out += "\\r"; break;
+        case '\t': out += "\\t"; break;
+        case '"':  out += "\\\""; break;
+        default:   out += c; break;
+        }
+    }
+    return out;
+}
+
 static std::string_view to_string(BinaryOp op) noexcept {
     switch (op) {
     case BinaryOp::Add:
@@ -209,6 +225,11 @@ static void format_statement_into(std::string& out, const Statement& s, int inde
                 out += st.expr ? format_expression(*st.expr) : "<null-expr>";
                 out += ";";
             },
+            [&](const PrintStringStatement& st) {
+                out += "print ";
+                out += std::format("\"{}\"", escape_for_source(st.content));
+                out += ";";
+            },
             [&](const ReturnStatement& st) {
                 out += "return ";
                 out += st.expr ? format_expression(*st.expr) : "<null-expr>";
@@ -336,6 +357,7 @@ std::string format_bytecode_operation(const BytecodeOperation& op) {
             [&](const BytecodeReturn&) { return std::string("RETURN"); },
 
             [&](const BytecodePrint&) { return std::string("PRINT"); },
+            [&](const BytecodePrintString& o) { return std::format("PRINT \"{}\"", o.content); },
         },
         op);
 }

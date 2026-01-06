@@ -41,6 +41,7 @@ struct BytecodeCallArgs { u32 func_id; u32 argc; };
 
 struct BytecodeReturn {};
 struct BytecodePrint {};
+struct BytecodePrintString { std::string content; };
 
 using BytecodeOperation = std::variant<
     BytecodePushI64,
@@ -52,7 +53,7 @@ using BytecodeOperation = std::variant<
     BytecodeJmp, BytecodeJmpFalse, BytecodeJmpTrue,
     BytecodeCall, BytecodeCallArgs,
     BytecodeReturn,
-    BytecodePrint>;
+    BytecodePrint, BytecodePrintString>;
 
 struct FunctionBytecode {
     std::vector<BytecodeOperation> code{};
