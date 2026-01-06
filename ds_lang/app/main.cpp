@@ -41,10 +41,10 @@ int main() {
     std::string code = load_code("examples/simple.ds");
 
     std::vector<Token> tokens = Lexer{code}.tokenize_all();
-    std::vector<Statement> statements = Parser{tokens}.parse_program();
+    std::vector<Statement> program = Parser{tokens}.parse_program();
 
     // Dump AST to Graphviz DOT
-    AstDot::write_dot_file("ast.dot", statements);
+    AstDot::write_dot_file("ast.dot", program);
 
     std::println("Tokens:");
     for (const Token& token : tokens) {
@@ -53,13 +53,13 @@ int main() {
     std::println();
 
     std::println("Functions:");
-    for (usize i = 0; i < statements.size(); ++i) {
-        std::println("[{:03}]\n{}", i, statements[i]);
+    for (usize i = 0; i < program.size(); ++i) {
+        std::println("[{:03}]\n{}", i, program[i]);
     }
     std::println();
 
     BytecodeBuilder builder{};
-    builder.build(statements);
+    builder.build(program);
 
     std::println("Bytecode:");
     for (usize i = 0; i < builder.functions().size(); ++i) {

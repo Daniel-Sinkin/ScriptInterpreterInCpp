@@ -8,10 +8,10 @@
 #include <variant>
 #include <vector>
 
+#include "formatters.hpp"
 #include "parser.hpp"
 #include "token.hpp"
 #include "util.hpp"
-#include "formatters.hpp"
 
 namespace ds_lang {
 bool Parser::at_end() const noexcept {
@@ -25,8 +25,8 @@ const Token &Parser::peek(usize offset) const {
     return tokens_[pos_ + offset];
 }
 
-TokenKind Parser::peek_kind(usize offset) const {
-    if(pos_ + offset >= tokens_.size()) {
+TokenKind Parser::peek_kind(usize offset = 0) const {
+    if (pos_ + offset >= tokens_.size()) {
         return TokenKind::Eof;
     }
     return tokens_[pos_ + offset].kind;
@@ -72,7 +72,6 @@ void Parser::error_here(std::string_view msg) const {
         t.line,
         t.column));
 }
-
 
 int Parser::infix_lbp(TokenKind k) noexcept {
     switch (k) {
@@ -157,7 +156,7 @@ bool Parser::is_prefix(TokenKind k) noexcept {
 }
 
 UnaryOp Parser::to_unary_op(TokenKind k) {
-    if(k == TokenKind::OpMinus) {
+    if (k == TokenKind::OpMinus) {
         return UnaryOp::Neg;
     } else if (k == TokenKind::OpBang) {
         return UnaryOp::Not;
@@ -208,10 +207,12 @@ std::unique_ptr<Expression> Parser::parse_expr_bp(int min_bp) {
             continue;
         }
 
-        if (is_expr_terminator(k)) break;
+        if (is_expr_terminator(k))
+            break;
 
         const int lbp = infix_lbp(k);
-        if (lbp < min_bp) break;
+        if (lbp < min_bp)
+            break;
 
         (void)advance(); // consume operator
         const int rbp = infix_rbp(k);
@@ -324,10 +325,26 @@ Statement Parser::parse_statement() {
     if (k == TokenKind::LBrace)
         return {parse_scope_statement()};
 
+    if(pos_ + 1 >= tokens_.size()) {
+        error_here("Not enough tokens left to make a valid statement.");
+    }
     if (k == TokenKind::Identifier && peek_kind(1) == TokenKind::OpAssign) {
-        return {parse_int_assignment_statement()};
+        if(peek_kind(2) == TokenKind::LBrace) {
+            return {parse_struct_assignment_statement()};
+        } else {
+            return {parse_int_assignment_statement()};
+        }
     }
 
+    if (k == TokenKind::Identifier && peek_kind(1) == TokenKind::Identifier) {
+        if(peek_kind(2) == TokenKind::OpAssign) {
+            return {parse_struct_declaration_assignment_statement()};
+        } else if (peek_kind(2) == TokenKind::Eos) {
+            return {parse_struct_declaration_statement()};
+        } else {
+            error_here("Invalid struct statement");
+        }
+    }
     error_here("Peeked TokenKind can't be a start of a statement");
 }
 
@@ -501,7 +518,6 @@ FunctionStatement Parser::parse_func_statement() {
 }
 
 StructStatement Parser::parse_struct_statement() {
-    // Must be top-level (enforced by parse_program)
     (void)consume(TokenKind::KWStruct, "Expected 'struct'");
     std::string struct_name{consume(TokenKind::Identifier, "Expected struct name after 'struct'").lexeme};
 
@@ -542,6 +558,55 @@ StructStatement Parser::parse_struct_statement() {
     return StructStatement{
         .struct_name = std::move(struct_name),
         .vars = std::move(vars),
+    };
+}
+
+StructVariableScope Parser::parse_struct_variable_scope_statement() {
+    (void)consume(TokenKind::LBrace, "Expected '{' at start of struct variable scope statement");
+    std::vector<Expression> exprs;
+    while (peek_kind() != TokenKind::RBrace) {
+        auto expr = parse_expression();
+        if (!expr) {
+            error_here("Failed to parse struct variable scope expression");
+        }
+        exprs.push_back(std::move(*expr));
+        if (peek_kind() == TokenKind::RBrace) {
+            break;
+        } else {
+            (void)consume(TokenKind::Comma, "Struct variable scope expressions must be ',' seperated");
+        }
+    }
+    (void)consume(TokenKind::RBrace, "Expected '{' at start of struct variable scope statement");
+    return StructVariableScope{
+        .exprs = std::move(exprs)};
+}
+
+StructDeclarationAssignmentStatement Parser::parse_struct_declaration_assignment_statement() {
+    std::string struct_name{consume(TokenKind::Identifier, "Expected struct name at start of struct declaration assignment statement").lexeme};
+    std::string var_name{consume(TokenKind::Identifier, "Expected var name after struct name").lexeme};
+    (void)consume(TokenKind::OpAssign, "Expected = sign after var name");
+    return {
+        .struct_name = std::move(struct_name),
+        .var_name = std::move(var_name),
+        .exprs = parse_struct_variable_scope_statement().exprs
+    };
+}
+
+StructDeclarationStatement Parser::parse_struct_declaration_statement() {
+    std::string struct_name{consume(TokenKind::Identifier, "Expected struct name at start of struct declaration assignment statement").lexeme};
+    std::string var_name{consume(TokenKind::Identifier, "Expected var name after struct name").lexeme};
+    return {
+        .struct_name = std::move(struct_name),
+        .var_name = std::move(var_name),
+    };
+}
+
+StructAssignmentStatement Parser::parse_struct_assignment_statement() {
+    std::string var_name{consume(TokenKind::Identifier, "Expected var name after struct name").lexeme};
+    (void)consume(TokenKind::OpAssign, "Expected = sign after var name");
+    return {
+        .var_name = std::move(var_name),
+        .exprs = parse_struct_variable_scope_statement().exprs
     };
 }
 

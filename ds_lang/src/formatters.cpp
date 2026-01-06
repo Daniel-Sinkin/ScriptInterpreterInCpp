@@ -4,12 +4,13 @@
 #include <format>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <variant>
 #include <vector>
 
+#include "bytecode.hpp"
 #include "parser.hpp"
 #include "util.hpp"
-#include "bytecode.hpp"
 
 namespace ds_lang::Fmt {
 
@@ -18,12 +19,24 @@ static std::string escape_for_source(std::string_view s) {
     out.reserve(s.size());
     for (char c : s) {
         switch (c) {
-        case '\\': out += "\\\\"; break;
-        case '\n': out += "\\n"; break;
-        case '\r': out += "\\r"; break;
-        case '\t': out += "\\t"; break;
-        case '"':  out += "\\\""; break;
-        default:   out += c; break;
+        case '\\':
+            out += "\\\\";
+            break;
+        case '\n':
+            out += "\\n";
+            break;
+        case '\r':
+            out += "\\r";
+            break;
+        case '\t':
+            out += "\\t";
+            break;
+        case '"':
+            out += "\\\"";
+            break;
+        default:
+            out += c;
+            break;
         }
     }
     return out;
@@ -96,16 +109,16 @@ static int precedence(BinaryOp op) noexcept {
     return -1;
 }
 
-static void append_indent(std::string& out, int indent) {
+static void append_indent(std::string &out, int indent) {
     out.append(static_cast<std::size_t>(indent), ' ');
 }
 
-static void format_expr_into(std::string& out, const Expression& e, int parent_prec, bool is_rhs) {
+static void format_expr_into(std::string &out, const Expression &e, int parent_prec, bool is_rhs) {
     std::visit(
         ds_lang::overloaded{
-            [&](const IntegerExpression& n) -> void { out += std::format("{}", n.value); },
-            [&](const IdentifierExpression& id) -> void { out += id.name; },
-            [&](const UnaryExpression& u) -> void {
+            [&](const IntegerExpression &n) -> void { out += std::format("{}", n.value); },
+            [&](const IdentifierExpression &id) -> void { out += id.name; },
+            [&](const UnaryExpression &u) -> void {
                 const int my_prec = Parser::kUnaryPrec;
                 const bool need_parens = my_prec < parent_prec;
                 if (need_parens) {
@@ -123,7 +136,7 @@ static void format_expr_into(std::string& out, const Expression& e, int parent_p
                     out += ")";
                 }
             },
-            [&](const BinaryExpression& b) -> void {
+            [&](const BinaryExpression &b) -> void {
                 const int my_prec = precedence(b.op);
                 const bool need_parens = (my_prec < parent_prec) || (is_rhs && my_prec == parent_prec);
 
@@ -151,7 +164,7 @@ static void format_expr_into(std::string& out, const Expression& e, int parent_p
                     out += ")";
                 }
             },
-            [&](const CallExpression& c) -> void {
+            [&](const CallExpression &c) -> void {
                 const int my_prec = Parser::kCallPrec;
                 const bool need_parens = my_prec < parent_prec;
                 if (need_parens) {
@@ -185,16 +198,16 @@ static void format_expr_into(std::string& out, const Expression& e, int parent_p
         e.node);
 }
 
-std::string format_expression(const Expression& e) {
+std::string format_expression(const Expression &e) {
     std::string out;
     out.reserve(64);
     format_expr_into(out, e, 0, false);
     return out;
 }
 
-static void format_statement_into(std::string& out, const Statement& s, int indent);
+static void format_statement_into(std::string &out, const Statement &s, int indent);
 
-static void format_scope_into(std::string& out, const std::vector<Statement>& scope, int indent) {
+static void format_scope_into(std::string &out, const std::vector<Statement> &scope, int indent) {
     for (std::size_t i = 0; i < scope.size(); ++i) {
         append_indent(out, indent);
         format_statement_into(out, scope[i], indent);
@@ -204,48 +217,48 @@ static void format_scope_into(std::string& out, const std::vector<Statement>& sc
     }
 }
 
-static void format_statement_into(std::string& out, const Statement& s, int indent) {
+static void format_statement_into(std::string &out, const Statement &s, int indent) {
     std::visit(
         ds_lang::overloaded{
-            [&](const IntDeclarationAssignmentStatement& st) {
+            [&](const IntDeclarationAssignmentStatement &st) {
                 out += "int ";
                 out += st.identifier;
                 out += " = ";
                 out += st.expr ? format_expression(*st.expr) : "<null-expr>";
                 out += ";";
             },
-            [&](const IntDeclarationStatement& st) {
+            [&](const IntDeclarationStatement &st) {
                 out += "int ";
                 out += st.identifier;
                 out += ";";
             },
-            [&](const IntAssignmentStatement& st) {
+            [&](const IntAssignmentStatement &st) {
                 out += st.identifier;
                 out += " = ";
                 out += st.expr ? format_expression(*st.expr) : "<null-expr>";
                 out += ";";
             },
-            [&](const PrintStatement& st) {
+            [&](const PrintStatement &st) {
                 out += "print ";
                 out += st.expr ? format_expression(*st.expr) : "<null-expr>";
                 out += ";";
             },
-            [&](const PrintStringStatement& st) {
+            [&](const PrintStringStatement &st) {
                 out += "print ";
                 out += std::format("\"{}\"", escape_for_source(st.content));
                 out += ";";
             },
-            [&](const ReturnStatement& st) {
+            [&](const ReturnStatement &st) {
                 out += "return ";
                 out += st.expr ? format_expression(*st.expr) : "<null-expr>";
                 out += ";";
             },
-            [&](const ScopeStatement& st) {
+            [&](const ScopeStatement &st) {
                 out += "{\n";
                 format_scope_into(out, st.scope, indent + 4);
                 out += "\n}";
             },
-            [&](const IfStatement& st) {
+            [&](const IfStatement &st) {
                 out += "if (";
                 out += st.if_expr ? format_expression(*st.if_expr) : "<null-expr>";
                 out += ") {\n";
@@ -264,7 +277,7 @@ static void format_statement_into(std::string& out, const Statement& s, int inde
                 append_indent(out, indent);
                 out += "}";
             },
-            [&](const WhileStatement& st) {
+            [&](const WhileStatement &st) {
                 out += "while (";
                 out += st.while_expr ? format_expression(*st.while_expr) : "<null-expr>";
                 out += ") {\n";
@@ -275,7 +288,7 @@ static void format_statement_into(std::string& out, const Statement& s, int inde
                 append_indent(out, indent);
                 out += "}";
             },
-            [&](const CallExpression& c) {
+            [&](const CallExpression &c) {
                 assert(false && "Copy paste error probably, should never touch this path");
                 if (c.callee) {
                     format_expr_into(out, *c.callee, Parser::kCallPrec, false);
@@ -296,7 +309,7 @@ static void format_statement_into(std::string& out, const Statement& s, int inde
                 }
                 out += ")";
             },
-            [&](const FunctionStatement& st) {
+            [&](const FunctionStatement &st) {
                 out += "func ";
                 out += st.func_name;
                 out += "(";
@@ -316,11 +329,11 @@ static void format_statement_into(std::string& out, const Statement& s, int inde
                 append_indent(out, indent);
                 out += "}";
             },
-            [&](const StructStatement& st) {
+            [&](const StructStatement &st) {
                 out += "struct ";
                 out += st.struct_name;
                 out += " {\n";
-                for(const auto& var : st.vars) {
+                for (const auto &var : st.vars) {
                     append_indent(out, indent + 4);
                     out += "int ";
                     out += var;
@@ -328,59 +341,86 @@ static void format_statement_into(std::string& out, const Statement& s, int inde
                 }
                 append_indent(out, indent);
                 out += "}";
-            }
+            },
+            [&](const StructDeclarationAssignmentStatement &st) {
+                out += st.struct_name;
+                out += " ";
+                out += st.var_name;
+                out += " = {";
+                for(usize i = 0; i < st.exprs.size(); ++i) {
+                    out += format_expression(st.exprs[i]);
+                    if(i < st.exprs.size() - 1) {
+                        out += ", ";
+                    }
+                }
+                out += "}";
+            },
+            [&](const StructDeclarationStatement &) {
+                std::unreachable();
+            },
+            [&](const StructAssignmentStatement &) {
+                std::unreachable();
+            },
+            [&](const StructVariableScope &st) {
+                out += "{";
+                for(const auto& expr: st.exprs) {
+                    format_expression(expr);
+                    out += ", ";
+                }
+                out += "}";
+            },
         },
         s.node);
 }
 
-std::string format_statement(const Statement& s) {
+std::string format_statement(const Statement &s) {
     std::string out;
     out.reserve(128);
     format_statement_into(out, s, 0);
     return out;
 }
 
-std::string format_bytecode_operation(const BytecodeOperation& op) {
+std::string format_bytecode_operation(const BytecodeOperation &op) {
     return std::visit(
         ds_lang::overloaded{
-            [&](const BytecodePushI64& o) { return std::format("PUSH_I64 {}", o.value); },
-            [&](const BytecodeAdd&) { return std::string("ADD"); },
-            [&](const BytecodeSub&) { return std::string("SUB"); },
-            [&](const BytecodeMult&) { return std::string("MULT"); },
-            [&](const BytecodeDiv&) { return std::string("DIV"); },
-            [&](const BytecodeMod&) { return std::string("MOD"); },
+            [&](const BytecodePushI64 &o) { return std::format("PUSH_I64 {}", o.value); },
+            [&](const BytecodeAdd &) { return std::string("ADD"); },
+            [&](const BytecodeSub &) { return std::string("SUB"); },
+            [&](const BytecodeMult &) { return std::string("MULT"); },
+            [&](const BytecodeDiv &) { return std::string("DIV"); },
+            [&](const BytecodeMod &) { return std::string("MOD"); },
 
-            [&](const BytecodeEQ&) { return std::string("EQ"); },
-            [&](const BytecodeNEQ&) { return std::string("NEQ"); },
-            [&](const BytecodeLT&) { return std::string("LT"); },
-            [&](const BytecodeLE&) { return std::string("LE"); },
-            [&](const BytecodeGT&) { return std::string("GT"); },
-            [&](const BytecodeGE&) { return std::string("GE"); },
+            [&](const BytecodeEQ &) { return std::string("EQ"); },
+            [&](const BytecodeNEQ &) { return std::string("NEQ"); },
+            [&](const BytecodeLT &) { return std::string("LT"); },
+            [&](const BytecodeLE &) { return std::string("LE"); },
+            [&](const BytecodeGT &) { return std::string("GT"); },
+            [&](const BytecodeGE &) { return std::string("GE"); },
 
-            [&](const BytecodeNEG&) { return std::string("NEG"); },
-            [&](const BytecodeNOT&) { return std::string("NOT"); },
+            [&](const BytecodeNEG &) { return std::string("NEG"); },
+            [&](const BytecodeNOT &) { return std::string("NOT"); },
 
-            [&](const BytecodePop&) { return std::string("POP"); },
+            [&](const BytecodePop &) { return std::string("POP"); },
 
-            [&](const BytecodeLoadLocal& o) { return std::format("LOAD_LOCAL {}", o.slot); },
-            [&](const BytecodeStoreLocal& o) { return std::format("STORE_LOCAL {}", o.slot); },
+            [&](const BytecodeLoadLocal &o) { return std::format("LOAD_LOCAL {}", o.slot); },
+            [&](const BytecodeStoreLocal &o) { return std::format("STORE_LOCAL {}", o.slot); },
 
-            [&](const BytecodeJmp& o) { return std::format("JMP {}", o.target_ip); },
-            [&](const BytecodeJmpFalse& o) { return std::format("JMP_FALSE {}", o.target_ip); },
-            [&](const BytecodeJmpTrue& o) { return std::format("JMP_TRUE {}", o.target_ip); },
+            [&](const BytecodeJmp &o) { return std::format("JMP {}", o.target_ip); },
+            [&](const BytecodeJmpFalse &o) { return std::format("JMP_FALSE {}", o.target_ip); },
+            [&](const BytecodeJmpTrue &o) { return std::format("JMP_TRUE {}", o.target_ip); },
 
-            [&](const BytecodeCall& o) { return std::format("CALL {}", o.func_id); },
-            [&](const BytecodeCallArgs& o) { return std::format("CALL_ARGS {} {}", o.func_id, o.argc); },
+            [&](const BytecodeCall &o) { return std::format("CALL {}", o.func_id); },
+            [&](const BytecodeCallArgs &o) { return std::format("CALL_ARGS {} {}", o.func_id, o.argc); },
 
-            [&](const BytecodeReturn&) { return std::string("RETURN"); },
+            [&](const BytecodeReturn &) { return std::string("RETURN"); },
 
-            [&](const BytecodePrint&) { return std::string("PRINT"); },
-            [&](const BytecodePrintString& o) { return std::format("PRINT \"{}\"", o.content); },
+            [&](const BytecodePrint &) { return std::string("PRINT"); },
+            [&](const BytecodePrintString &o) { return std::format("PRINT \"{}\"", o.content); },
         },
         op);
 }
 
-std::string format_function_bytecode(const FunctionBytecode& fn) {
+std::string format_function_bytecode(const FunctionBytecode &fn) {
     std::string out;
     out += std::format("FunctionBytecode(num_locals={}, num_params={}, code=[", fn.num_locals, fn.num_params);
     for (std::size_t i = 0; i < fn.code.size(); ++i) {

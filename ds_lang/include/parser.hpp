@@ -124,7 +124,27 @@ struct FunctionStatement {
 
 struct StructStatement {
     std::string struct_name;
-    std::vector<std::string> vars; // currently: field names only (all are "int" implicitly)
+    std::vector<std::string> vars;
+};
+
+struct StructDeclarationAssignmentStatement {
+    std::string struct_name;
+    std::string var_name;
+    std::vector<Expression> exprs;
+};
+
+struct StructDeclarationStatement {
+    std::string struct_name;
+    std::string var_name;
+};
+
+struct StructAssignmentStatement {
+    std::string var_name;
+    std::vector<Expression> exprs;
+};
+
+struct StructVariableScope {
+    std::vector<Expression> exprs;
 };
 
 struct Statement {
@@ -139,14 +159,16 @@ struct Statement {
         WhileStatement,
         FunctionStatement,
         StructStatement,
+        StructDeclarationAssignmentStatement,
+        StructDeclarationStatement,
+        StructAssignmentStatement,
         ScopeStatement>;
     Variant node;
 };
 
 class Parser {
 public:
-    explicit Parser(const std::vector<Token> &tokens) noexcept
-        : tokens_(tokens), pos_(0) {}
+    explicit Parser(const std::vector<Token> &tokens) noexcept : tokens_(tokens), pos_(0) {}
 
     Parser() = delete;
     Parser(const Parser &) = default;
@@ -174,7 +196,11 @@ public:
     [[nodiscard]] IfStatement parse_if_statement();
     [[nodiscard]] WhileStatement parse_while_statement();
     [[nodiscard]] FunctionStatement parse_func_statement();
+    [[nodiscard]] StructVariableScope parse_struct_variable_scope_statement();
     [[nodiscard]] StructStatement parse_struct_statement();
+    [[nodiscard]] StructDeclarationAssignmentStatement parse_struct_declaration_assignment_statement();
+    [[nodiscard]] StructDeclarationStatement parse_struct_declaration_statement();
+    [[nodiscard]] StructAssignmentStatement parse_struct_assignment_statement();
 
 private:
     const std::vector<Token> &tokens_;
