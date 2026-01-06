@@ -14,10 +14,17 @@
 
 namespace ds_lang {
 
-FunctionBytecode &BytecodeBuilder::fn() { return functions_.at(static_cast<usize>(active_func_)); }
-const FunctionBytecode &BytecodeBuilder::fn() const { return functions_.at(static_cast<usize>(active_func_)); }
+FunctionBytecode &BytecodeBuilder::fn() {
+    return functions_.at(static_cast<usize>(active_func_));
+}
 
-IPtr BytecodeBuilder::ip() const noexcept { return fn().code.size(); }
+const FunctionBytecode &BytecodeBuilder::fn() const {
+    return functions_.at(static_cast<usize>(active_func_));
+}
+
+IPtr BytecodeBuilder::ip() const noexcept {
+    return fn().code.size();
+}
 
 IPtr BytecodeBuilder::emit(BytecodeOperation op) {
     const IPtr here = ip();
@@ -25,7 +32,9 @@ IPtr BytecodeBuilder::emit(BytecodeOperation op) {
     return here;
 }
 
-BytecodeOperation &BytecodeBuilder::at(IPtr where) { return fn().code.at(where); }
+BytecodeOperation &BytecodeBuilder::at(IPtr where) {
+    return fn().code.at(where);
+}
 
 void BytecodeBuilder::patch_jump(IPtr where, IPtr target) {
     if (target == INVALIDIPtr)
@@ -49,9 +58,20 @@ void BytecodeBuilder::patch_jump(IPtr where, IPtr target) {
                     throw std::runtime_error("patch_jump: already patched");
                 j.target_ip = target;
             },
-            [&](auto &) { throw std::runtime_error("patch_jump: not a jump op"); },
+            [&](auto &) {
+                throw std::runtime_error("patch_jump: not a jump op");
+            },
         },
         op);
+}
+
+const BytecodeBuilder::StructInfo &
+BytecodeBuilder::resolve_struct(std::string_view struct_name) const {
+    const std::string key{struct_name};
+    const auto it = struct_defs_.find(key);
+    if (it == struct_defs_.end())
+        throw std::runtime_error("Unknown struct type: " + key);
+    return it->second;
 }
 
 void BytecodeBuilder::begin_function_locals(const std::vector<std::string> &params) {
@@ -66,7 +86,16 @@ void BytecodeBuilder::begin_function_locals(const std::vector<std::string> &para
         const std::string &p = params[i];
         if (base.contains(p))
             throw std::runtime_error("Duplicate parameter: " + p);
-        base.emplace(p, static_cast<u32>(i));
+
+        const u32 slot = static_cast<u32>(i);
+        base.emplace(
+            p,
+            LocalInfo{
+                .kind = LocalInfoKind::Int,
+                .base_slot = slot,
+                .struct_name = std::nullopt,
+                .struct_size_slots = std::nullopt,
+            });
 
         if (fn().seen_symbols.size() <= i)
             fn().seen_symbols.resize(i + 1);
@@ -93,14 +122,22 @@ void BytecodeBuilder::end_scope() {
 u32 BytecodeBuilder::declare_local(std::string_view name) {
     if (scopes_.empty())
         throw std::runtime_error("declare_local: no scope");
-    const std::string key{name};
 
+    const std::string key{name};
     auto &cur = scopes_.back().locals;
+
     if (cur.contains(key))
         throw std::runtime_error("Variable already declared in this scope: " + key);
 
     const u32 slot = next_slot_;
-    cur.emplace(key, slot);
+    cur.emplace(
+        key,
+        LocalInfo{
+            .kind = LocalInfoKind::Int,
+            .base_slot = slot,
+            .struct_name = std::nullopt,
+            .struct_size_slots = std::nullopt,
+        });
 
     next_slot_ += 1;
     max_slot_ = std::max(max_slot_, next_slot_);
@@ -113,12 +150,58 @@ u32 BytecodeBuilder::declare_local(std::string_view name) {
     return slot;
 }
 
+BytecodeBuilder::LocalInfo
+BytecodeBuilder::declare_struct_local_info(std::string_view var_name,
+                                           std::string_view struct_type) {
+    if (scopes_.empty())
+        throw std::runtime_error("declare_struct_local_info: no scope");
+
+    const std::string key{var_name};
+    auto &cur = scopes_.back().locals;
+
+    if (cur.contains(key))
+        throw std::runtime_error("Variable already declared in this scope: " + key);
+
+    const StructInfo &info = resolve_struct(struct_type);
+    const u32 n = static_cast<u32>(info.field_names.size());
+    const u32 base = next_slot_;
+
+    cur.emplace(
+        key,
+        LocalInfo{
+            .kind = LocalInfoKind::Struct,
+            .base_slot = base,
+            .struct_name = std::string(struct_type),
+            .struct_size_slots = n,
+        });
+
+    next_slot_ += n;
+    max_slot_ = std::max(max_slot_, next_slot_);
+
+    const usize base_u = static_cast<usize>(base);
+    if (fn().seen_symbols.size() < base_u + n)
+        fn().seen_symbols.resize(base_u + n);
+
+    for (u32 i = 0; i < n; ++i) {
+        fn().seen_symbols[base_u + i] =
+            std::string(var_name) + "." + info.field_names[i];
+    }
+
+    return cur.at(key);
+}
+
 u32 BytecodeBuilder::resolve_local(std::string_view name) const {
     const std::string key{name};
+
     for (auto it = scopes_.rbegin(); it != scopes_.rend(); ++it) {
         const auto f = it->locals.find(key);
-        if (f != it->locals.end())
-            return f->second;
+        if (f != it->locals.end()) {
+            if (f->second.kind != LocalInfoKind::Int) {
+                throw std::runtime_error(
+                    "Struct value used as int: " + key);
+            }
+            return f->second.base_slot;
+        }
     }
     throw std::runtime_error("Undefined variable: " + key);
 }
@@ -136,8 +219,9 @@ u32 BytecodeBuilder::resolve_func(std::string_view name) const {
 }
 
 void BytecodeBuilder::build_scope_statements(const std::vector<Statement> &sts) {
-    for (const auto &st : sts)
+    for (const auto &st : sts) {
         build_statement(st);
+    }
 }
 
 void BytecodeBuilder::build_expression(const Expression &expr) {
@@ -381,39 +465,54 @@ void BytecodeBuilder::build(const std::vector<Statement> &program) {
     functions_.clear();
     func_ids_.clear();
     entry_func_.reset();
+    struct_defs_.clear();
 
     std::vector<const FunctionStatement *> funcs;
+
+    // pass 0: collect structs + functions
     for (const Statement &st : program) {
-        if (const auto *fnst = std::get_if<FunctionStatement>(&st.node)) {
-            funcs.push_back(fnst);
+        if (const auto *fs =
+                std::get_if<FunctionStatement>(&st.node)) {
+            funcs.push_back(fs);
+        } else if (const auto *ss =
+                       std::get_if<StructStatement>(&st.node)) {
+            if (struct_defs_.contains(ss->struct_name))
+                throw std::runtime_error(
+                    "Duplicate struct: " + ss->struct_name);
+            struct_defs_.emplace(
+                ss->struct_name,
+                StructInfo{
+                    .name = ss->struct_name,
+                    .field_names = ss->vars,
+                });
         } else {
-            throw std::runtime_error("Only function declarations are allowed at top level (define func main())");
+            throw std::runtime_error(
+                "Only function and struct declarations allowed at top level");
         }
     }
 
+    // pass 1: assign function IDs
     for (const FunctionStatement *f : funcs) {
-        if (func_ids_.contains(f->func_name)) {
-            throw std::runtime_error("Duplicate function: " + f->func_name);
-        }
+        if (func_ids_.contains(f->func_name))
+            throw std::runtime_error(
+                "Duplicate function: " + f->func_name);
 
         const u32 id = static_cast<u32>(functions_.size());
         func_ids_.emplace(f->func_name, id);
 
         FunctionBytecode bc;
         bc.num_params = static_cast<u32>(f->vars.size());
-        bc.num_locals = bc.num_params; // will grow while compiling
+        bc.num_locals = bc.num_params;
         functions_.push_back(std::move(bc));
     }
 
-    {
-        const auto it = func_ids_.find("main");
-        if (it == func_ids_.end()) {
-            throw std::runtime_error("Missing entry point: define func main()");
-        }
-        entry_func_ = it->second;
+    const auto it = func_ids_.find("main");
+    if (it == func_ids_.end()) {
+        throw std::runtime_error("Missing entry point: define func main()");
     }
+    entry_func_ = it->second;
 
-    // Pass 2: compile bodies
+    // pass 2: compile bodies
     for (const FunctionStatement *f : funcs) {
         active_func_ = resolve_func(f->func_name);
 

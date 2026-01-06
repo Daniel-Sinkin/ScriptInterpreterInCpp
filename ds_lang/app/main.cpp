@@ -35,7 +35,7 @@ void run_struct_example() {
 
 int main() {
     using namespace ds_lang;
-    run_struct_example();
+    // run_struct_example();
 
     std::string code = load_code("examples/simple.ds");
 

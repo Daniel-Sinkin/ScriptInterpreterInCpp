@@ -27,10 +27,29 @@ private:
     std::unordered_map<std::string, u32> func_ids_{};
     std::optional<u32> entry_func_{std::nullopt};
 
+    struct StructInfo {
+        std::string name;
+        std::vector<std::string> field_names;
+    };
+
+    std::unordered_map<std::string, StructInfo> struct_defs_{};
+
     u32 active_func_{0};
 
+    enum class LocalInfoKind {
+        Int,
+        Struct,
+    };
+
+    struct LocalInfo {
+        LocalInfoKind kind{LocalInfoKind::Int};
+        u32 base_slot{0};
+        std::optional<std::string> struct_name{std::nullopt};
+        std::optional<u32> struct_size_slots{std::nullopt};
+    };
+
     struct Scope {
-        std::unordered_map<std::string, u32> locals;
+        std::unordered_map<std::string, LocalInfo> locals;
         u32 saved_next_slot{0};
     };
 
@@ -53,6 +72,10 @@ private:
     void end_scope();
 
     u32 declare_local(std::string_view name);
+
+    [[nodiscard]] const StructInfo& resolve_struct(std::string_view struct_name) const;
+    LocalInfo declare_struct_local_info(std::string_view var_name, std::string_view struct_type);
+
     u32 resolve_local(std::string_view name) const;
 
     u32 resolve_func(std::string_view name) const;
