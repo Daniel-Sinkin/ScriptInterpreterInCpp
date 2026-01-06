@@ -13,6 +13,7 @@ func my_func(x) {
         print i;
     }
 
+    int y = 0;
     if (x > 5) {
         int y = 5;
     } else {
