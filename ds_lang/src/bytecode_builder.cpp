@@ -8,6 +8,7 @@
 
 #include "bytecode.hpp"
 #include "parser.hpp"
+#include "types.hpp"
 #include "util.hpp"
 
 namespace ds_lang {
@@ -222,10 +223,15 @@ void BytecodeBuilder::build_expression(const Expression& expr) {
 void BytecodeBuilder::build_statement(const Statement& st) {
     std::visit(
         overloaded{
-            [&](const IntDeclarationStatement& s) {
-                if (!s.expr) throw std::runtime_error("IntDeclarationStatement missing expr");
+            [&](const IntDeclarationAssignmentStatement& s) {
+                if (!s.expr) throw std::runtime_error("IntDeclarationAssignmentStatement missing expr");
                 const u32 slot = declare_local(s.identifier);
                 build_expression(*s.expr);
+                emit(BytecodeStoreLocal{slot});
+            },
+            [&](const IntDeclarationStatement& s) {
+                const u32 slot = declare_local(s.identifier);
+                emit(BytecodePushI64{.value=UNINIALISED_VALUE});
                 emit(BytecodeStoreLocal{slot});
             },
             [&](const IntAssignmentStatement& s) {
@@ -292,6 +298,9 @@ void BytecodeBuilder::build_statement(const Statement& st) {
             },
             [&](const FunctionStatement&) -> void {
                 throw std::runtime_error("Nested functions are not supported");
+            },
+            [&](const StructStatement&) -> void {
+                throw std::runtime_error("Structs must not be declared inside of function scopes.");
             },
         },
         st.node);

@@ -64,6 +64,7 @@ set(LEXER_TEST_CASES
     string_literal
     unterminated_string_throws
     string_contains_semicolon_throws
+    struct_keyword
 )
 
 foreach(tc IN LISTS LEXER_TEST_CASES)
@@ -71,9 +72,6 @@ foreach(tc IN LISTS LEXER_TEST_CASES)
              COMMAND ds_lang_tests --case ${tc})
 endforeach()
 
-# -----------------------
-# Util tests
-# -----------------------
 add_executable(ds_lang_util_tests tests/test_util.cpp)
 target_link_libraries(ds_lang_util_tests PRIVATE ds_lang ds_lang_warnings)
 target_compile_features(ds_lang_util_tests PRIVATE cxx_std_23)
@@ -118,6 +116,9 @@ set(PARSER_TEST_CASES
     scope_statement_formatting
     missing_expression_throws
     missing_rbrace_throws
+    struct_statement_structure
+    struct_not_allowed_in_function_scope
+    top_level_only_allows_func_and_struct
 )
 
 foreach(tc IN LISTS PARSER_TEST_CASES)

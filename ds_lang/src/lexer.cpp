@@ -28,6 +28,7 @@ static TokenKind keyword_or_identifier(std::string_view s) {
     if (s == "int")    return TokenKind::KWInt;
     if (s == "print")  return TokenKind::KWPrint;
     if (s == "func")   return TokenKind::KWFunc;
+    if (s == "struct") return TokenKind::KWStruct;
     if (s == "return") return TokenKind::KWReturn;
     if (s == "if")     return TokenKind::KWIf;
     if (s == "else")   return TokenKind::KWElse;
@@ -154,7 +155,7 @@ std::vector<Token> Lexer::tokenize_range(usize left, usize right) const {
                 if (c == '"') {
                     break;
                 }
-                if (is_eos(c)) { // TODO: Maybe allos ; in strings, not sure yet
+                if (is_eos(c)) { // TODO: Maybe allow ; in strings, not sure yet
                     throw std::runtime_error(std::format(
                         "Unterminated string literal before ';' (line={},column={})",
                         tok_line, tok_col));
@@ -276,7 +277,6 @@ std::vector<Token> Lexer::tokenize_range(usize left, usize right) const {
             emit(TokenKind::OpBang, start, 1, tok_line, tok_col);
             new_char();
             continue;
-
         case '<':
             emit(TokenKind::OpLt, start, 1, tok_line, tok_col);
             new_char();
@@ -295,8 +295,6 @@ std::vector<Token> Lexer::tokenize_range(usize left, usize right) const {
             }
             const std::string_view lex = code_.substr(start, pos - start);
             emit(TokenKind::Integer, start, pos - start, tok_line, tok_col);
-
-            // Validation
             (void)determine_token_kind(lex, tok_line, tok_col);
             continue;
         }

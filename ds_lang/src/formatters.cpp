@@ -207,11 +207,16 @@ static void format_scope_into(std::string& out, const std::vector<Statement>& sc
 static void format_statement_into(std::string& out, const Statement& s, int indent) {
     std::visit(
         ds_lang::overloaded{
-            [&](const IntDeclarationStatement& st) {
+            [&](const IntDeclarationAssignmentStatement& st) {
                 out += "int ";
                 out += st.identifier;
                 out += " = ";
                 out += st.expr ? format_expression(*st.expr) : "<null-expr>";
+                out += ";";
+            },
+            [&](const IntDeclarationStatement& st) {
+                out += "int ";
+                out += st.identifier;
                 out += ";";
             },
             [&](const IntAssignmentStatement& st) {
@@ -311,6 +316,19 @@ static void format_statement_into(std::string& out, const Statement& s, int inde
                 append_indent(out, indent);
                 out += "}";
             },
+            [&](const StructStatement& st) {
+                out += "struct ";
+                out += st.struct_name;
+                out += " {\n";
+                for(const auto& var : st.vars) {
+                    append_indent(out, indent + 4);
+                    out += "int ";
+                    out += var;
+                    out += ";\n";
+                }
+                append_indent(out, indent);
+                out += "}";
+            }
         },
         s.node);
 }

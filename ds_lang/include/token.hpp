@@ -13,6 +13,7 @@ enum class TokenKind {
     KWInt,      // int
     KWPrint,    // print
     KWFunc,     // func
+    KWStruct,     // struct
     KWReturn,   // return
     KWIf,       // if
     KWElse,     // else
@@ -70,6 +71,8 @@ constexpr std::string_view to_string(TokenKind k) noexcept {
         return "KWPrint";
     case TokenKind::KWFunc:
         return "KWFunc";
+    case TokenKind::KWStruct:
+        return "KWStruct";
     case TokenKind::KWReturn:
         return "KWReturn";
     case TokenKind::KWIf:
@@ -152,6 +155,8 @@ constexpr std::string_view explain(TokenKind k) noexcept {
         return "Keyword for printing a value to standard output.";
     case TokenKind::KWFunc:
         return "Keyword introducing a function definition.";
+    case TokenKind::KWStruct:
+        return "Keyword introducing a struct definition.";
     case TokenKind::KWReturn:
         return "Keyword returning a value from a function.";
     case TokenKind::KWIf:

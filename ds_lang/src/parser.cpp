@@ -273,7 +273,6 @@ std::unique_ptr<Expression> Parser::nud(const Token &t) {
         (void)consume(TokenKind::RParen, "Expected ')' after parenthesized expression");
         return inner;
     }
-
     default:
         throw std::runtime_error(std::format(
             "Expected expression, got {} {:?} at line={},column={}",
@@ -283,93 +282,135 @@ std::unique_ptr<Expression> Parser::nud(const Token &t) {
 
 Statement Parser::parse_statement() {
     skip_eos();
-    if (at_end()) {
+    if (at_end())
         throw std::runtime_error("Trying to parse statement at the end");
+
+    // Enforce: no struct or func inside block scope.
+    if (ctx_ != Context::TopLevel) {
+        if (peek().kind == TokenKind::KWStruct) {
+            error_here("struct is only allowed at global scope");
+        }
+        if (peek().kind == TokenKind::KWFunc) {
+            error_here("func is only allowed at global scope");
+        }
     }
 
-    TokenKind k = peek().kind;
+    const TokenKind k = peek().kind;
+
     if (k == TokenKind::KWInt) {
-        return {parse_int_declaration_statement()};
-    } else if (k == TokenKind::KWPrint) {
-        if(peek_kind(1) == TokenKind::String) {
-            return {parse_print_string_statement()};
+        // Decide between:
+        //   int x = expr;
+        //   int x;
+        if (peek_kind(1) != TokenKind::Identifier) {
+            error_here("Expected identifier after 'int'");
         }
-        return {parse_print_statement()};
-    } else if (k == TokenKind::KWFunc) {
-        return {parse_func_statement()};
-    } else if (k == TokenKind::KWReturn) {
-        return {parse_return_statement()};
-    } else if (k == TokenKind::KWIf) {
-        return {parse_if_statement()};
-    } else if (k == TokenKind::KWWhile) {
-        return {parse_while_statement()};
-    } else if (k == TokenKind::LBrace) {
-        return {parse_scope_statement()};
-    } else if (k == TokenKind::Identifier && peek_kind(1) == TokenKind::OpAssign) {
-        return {parse_int_assignment_statement()};
-    } else {
-        error_here("Peeked TokenKind can't be a start of a statement scope");
+        if (peek_kind(2) == TokenKind::OpAssign) {
+            return {parse_int_declaration_assignment_statement()};
+        }
+        return {parse_int_declaration_statement()};
     }
-    std::unreachable();
+
+    if (k == TokenKind::KWPrint) {
+        if (peek_kind(1) == TokenKind::String)
+            return {parse_print_string_statement()};
+        return {parse_print_statement()};
+    }
+    if (k == TokenKind::KWReturn)
+        return {parse_return_statement()};
+    if (k == TokenKind::KWIf)
+        return {parse_if_statement()};
+    if (k == TokenKind::KWWhile)
+        return {parse_while_statement()};
+    if (k == TokenKind::LBrace)
+        return {parse_scope_statement()};
+
+    if (k == TokenKind::Identifier && peek_kind(1) == TokenKind::OpAssign) {
+        return {parse_int_assignment_statement()};
+    }
+
+    error_here("Peeked TokenKind can't be a start of a statement");
 }
 
 std::vector<Statement> Parser::parse_program() {
-    std::vector<Statement> statements;
+    std::vector<Statement> out;
+
+    ctx_ = Context::TopLevel;
 
     skip_eos();
     while (peek().kind != TokenKind::Eof) {
-        statements.push_back(parse_statement());
+        const TokenKind k = peek().kind;
+
+        if (k == TokenKind::KWFunc) {
+            out.push_back(Statement{parse_func_statement()});
+        } else if (k == TokenKind::KWStruct) {
+            out.push_back(Statement{parse_struct_statement()});
+        } else {
+            error_here("Only 'func' and 'struct' declarations are allowed at global scope");
+        }
+
         skip_eos();
     }
+    return out;
+}
+
+std::vector<Statement> Parser::parse_scope() {
+    // Called for normal block scopes (function body, if/else, while, or standalone { }).
+    // Enforce block context.
+    (void)consume(TokenKind::LBrace, "Scope parsing must start at '{'");
+
+    const auto prev = ctx_;
+    ctx_ = Context::Block;
+
+    std::vector<Statement> statements;
+    int guard = 0;
+
+    while (true) {
+        skip_eos();
+        if (peek().kind == TokenKind::RBrace) {
+            (void)consume(TokenKind::RBrace, "Expected '}'");
+            break;
+        }
+
+        statements.push_back(parse_statement());
+
+        if (++guard > 100000) {
+            throw std::runtime_error("parse_scope: runaway parse (guard hit)");
+        }
+    }
+
+    ctx_ = prev;
     return statements;
 }
 
-std::vector<Statement> Parser::parse_scope()
-{
-    (void)consume(TokenKind::LBrace, "Scope parsing must start at {");
-    std::vector<Statement> statements;
-    int i = 0;
-    while (true) {
-        skip_eos();
-        const TokenKind k = peek().kind;
-        if (k == TokenKind::RBrace) {            
-            (void)consume(TokenKind::RBrace, "Logic error on checked RBrace eating, shouldn't happen");
-            break;
-        }
-        statements.push_back(parse_statement());
-        ++i;
-        if(i > 1000) {
-            throw std::runtime_error("Overflow on parse scope");
-        }
+IntDeclarationAssignmentStatement Parser::parse_int_declaration_assignment_statement() {
+    (void)consume(TokenKind::KWInt, "Expected 'int' at start of declaration statement");
+    const Token &id = consume(TokenKind::Identifier, "Expected identifier after 'int'");
+    (void)consume(TokenKind::OpAssign, "Expected '=' after identifier in int declaration");
+    auto rhs = parse_expr_bp(0);
+    while (match(TokenKind::Eos)) {
     }
-    return statements;
+    return IntDeclarationAssignmentStatement{.identifier = std::string(id.lexeme), .expr = std::move(rhs)};
 }
 
 IntDeclarationStatement Parser::parse_int_declaration_statement() {
     (void)consume(TokenKind::KWInt, "Expected 'int' at start of declaration statement");
-
     const Token &id = consume(TokenKind::Identifier, "Expected identifier after 'int'");
-    (void)consume(TokenKind::OpAssign, "Expected '=' after identifier in IntDeclarationStatement");
-
-    auto rhs = parse_expr_bp(0);
-
     while (match(TokenKind::Eos)) {
     }
-    return IntDeclarationStatement{.identifier = std::string(id.lexeme), .expr = std::move(rhs)};
+    return IntDeclarationStatement{.identifier = std::string(id.lexeme)};
 }
 
 IntAssignmentStatement Parser::parse_int_assignment_statement() {
-    const Token &id = consume(TokenKind::Identifier, "Expected identifier after 'int'");
-    (void)consume(TokenKind::OpAssign, "Expected '=' after identifier in IntAssignmentStatement");
+    const Token &id = consume(TokenKind::Identifier, "Expected identifier");
+    (void)consume(TokenKind::OpAssign, "Expected '=' after identifier in assignment");
     auto rhs = parse_expr_bp(0);
     while (match(TokenKind::Eos)) {
     }
     return IntAssignmentStatement{.identifier = std::string(id.lexeme), .expr = std::move(rhs)};
 }
 
-
 PrintStatement Parser::parse_print_statement() {
-    (void)consume(TokenKind::KWPrint, "Expected 'PRINT' at start of PrintStatement");
+    (void)consume(TokenKind::KWPrint, "Expected 'print' at start of PrintStatement");
     auto rhs = parse_expr_bp(0);
     while (match(TokenKind::Eos)) {
     }
@@ -378,74 +419,130 @@ PrintStatement Parser::parse_print_statement() {
 
 PrintStringStatement Parser::parse_print_string_statement() {
     (void)consume(TokenKind::KWPrint, "Expected 'print' at start of PrintStringStatement");
-    const Token& token = consume(TokenKind::String, "Expected string literal after 'print'");
-    while (match(TokenKind::Eos)) {}
-    return PrintStringStatement{ .content = std::string{token.lexeme} };
+    const Token &token = consume(TokenKind::String, "Expected string literal after 'print'");
+    while (match(TokenKind::Eos)) {
+    }
+    return PrintStringStatement{.content = std::string{token.lexeme}};
 }
 
-
 ReturnStatement Parser::parse_return_statement() {
-    (void)consume(TokenKind::KWReturn, "Expected 'RETURN' at start of assignment statement");
+    (void)consume(TokenKind::KWReturn, "Expected 'return' at start of ReturnStatement");
     auto rhs = parse_expr_bp(0);
     while (match(TokenKind::Eos)) {
     }
     return ReturnStatement{.expr = std::move(rhs)};
 }
-ScopeStatement Parser::parse_scope_statement() {
-    return { parse_scope() };
-}
 
+ScopeStatement Parser::parse_scope_statement() { return ScopeStatement{.scope = parse_scope()}; }
 
 WhileStatement Parser::parse_while_statement() {
-    (void)consume(TokenKind::KWWhile, "Expected 'while' at start of assignment statement");
+    (void)consume(TokenKind::KWWhile, "Expected 'while'");
     (void)consume(TokenKind::LParen, "Expected '(' after while");
     auto while_expr = parse_expr_bp(0);
-    (void)consume(TokenKind::RParen, "Expected '(' after while");
-    std::vector<Statement> do_scope = parse_scope();
-    return WhileStatement{
-        .while_expr = std::move(while_expr),
-        .do_scope = std::move(do_scope)};
+    (void)consume(TokenKind::RParen, "Expected ')' after while condition");
+    auto do_scope = parse_scope();
+    return WhileStatement{.while_expr = std::move(while_expr), .do_scope = std::move(do_scope)};
 }
+
 IfStatement Parser::parse_if_statement() {
-    (void)consume(TokenKind::KWIf, "Expected 'if' at start of assignment statement");
-    (void)consume(TokenKind::LParen, "Expected '(' after if and before condition");
+    (void)consume(TokenKind::KWIf, "Expected 'if'");
+    (void)consume(TokenKind::LParen, "Expected '(' after if");
     auto if_expr = parse_expr_bp(0);
     (void)consume(TokenKind::RParen, "Expected ')' after if condition");
-    std::vector<Statement> then_scope = parse_scope();
+
+    auto then_scope = parse_scope();
     std::vector<Statement> else_scope{};
     if (match(TokenKind::KWElse)) {
         skip_eos();
         else_scope = parse_scope();
     }
+
     return IfStatement{
         .if_expr = std::move(if_expr),
         .then_scope = std::move(then_scope),
-        .else_scope = std::move(else_scope)};
+        .else_scope = std::move(else_scope),
+    };
 }
+
 FunctionStatement Parser::parse_func_statement() {
-    (void)consume(TokenKind::KWFunc, "Expected 'FUNC' at start of assignment statement");
-    std::string func_name{consume(TokenKind::Identifier, "Expected Identifier after FUNC").lexeme};
+    // Must be top-level (enforced by parse_program)
+    (void)consume(TokenKind::KWFunc, "Expected 'func'");
+    std::string func_name{consume(TokenKind::Identifier, "Expected function name after 'func'").lexeme};
+
     (void)consume(TokenKind::LParen, "Expected '(' after function name");
     std::vector<std::string> vars;
-    while (peek().kind != TokenKind::RParen) { // extract the identifiers x, y from "if(x,y)"
+
+    while (peek().kind != TokenKind::RParen) {
         if (peek().kind == TokenKind::Identifier) {
-            std::string name{consume(TokenKind::Identifier, "Peeked Function Var Identifier, this shouldn't fail").lexeme};
+            std::string name{consume(TokenKind::Identifier, "Expected parameter name").lexeme};
             if (std::ranges::contains(vars, name)) {
                 throw std::runtime_error("Duplicate function arguments");
             }
-            vars.push_back(name);
+            vars.push_back(std::move(name));
+        } else {
+            error_here("Expected identifier in parameter list");
         }
+
         if (peek().kind == TokenKind::Comma) {
-            (void)consume(TokenKind::Comma, "Peeked, shouldn't error");
+            (void)consume(TokenKind::Comma, "Expected ','");
+        } else {
+            break;
         }
     }
+
     (void)consume(TokenKind::RParen, "Expected ')' after function arguments");
-    std::vector<Statement> statements = parse_scope();
+    auto statements = parse_scope();
 
     return FunctionStatement{
         .func_name = std::move(func_name),
         .vars = std::move(vars),
-        .statements = std::move(statements)};
+        .statements = std::move(statements),
+    };
+}
+
+StructStatement Parser::parse_struct_statement() {
+    // Must be top-level (enforced by parse_program)
+    (void)consume(TokenKind::KWStruct, "Expected 'struct'");
+    std::string struct_name{consume(TokenKind::Identifier, "Expected struct name after 'struct'").lexeme};
+
+    (void)consume(TokenKind::LBrace, "Expected '{' to start struct body");
+
+    // Struct body parsing is custom: only "int <ident> ;" allowed.
+    std::vector<std::string> vars;
+    int guard = 0;
+
+    while (true) {
+        skip_eos();
+        if (peek().kind == TokenKind::RBrace) {
+            (void)consume(TokenKind::RBrace, "Expected '}'");
+            break;
+        }
+
+        (void)consume(TokenKind::KWInt, "Struct fields must start with 'int'");
+        std::string field{consume(TokenKind::Identifier, "Expected field name").lexeme};
+
+        // No assignments inside struct for now.
+        if (peek().kind == TokenKind::OpAssign) {
+            error_here("Struct fields cannot have initializers");
+        }
+
+        // Require at least one ';' (allows extra ';' via skip_eos in loop).
+        (void)consume(TokenKind::Eos, "Expected ';' after struct field declaration");
+
+        if (std::ranges::contains(vars, field)) {
+            throw std::runtime_error("Duplicate struct field: " + field);
+        }
+        vars.push_back(std::move(field));
+
+        if (++guard > 100000) {
+            throw std::runtime_error("parse_struct_statement: runaway parse (guard hit)");
+        }
+    }
+
+    return StructStatement{
+        .struct_name = std::move(struct_name),
+        .vars = std::move(vars),
+    };
 }
 
 } // namespace ds_lang

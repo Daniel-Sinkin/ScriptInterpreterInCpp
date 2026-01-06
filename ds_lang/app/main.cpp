@@ -11,8 +11,32 @@
 #include "bytecode_builder.hpp"
 #include "vm.hpp"
 
+void run_struct_example() {
+    using namespace ds_lang;
+
+    std::string code = load_code("examples/struct.ds");
+
+    std::vector<Token> tokens = Lexer{code}.tokenize_all();
+
+    std::println("Tokens:");
+    for (const Token& token : tokens) {
+        std::println("{}", token);
+    }
+    std::println();
+
+    std::vector<Statement> statements = Parser{tokens}.parse_program();
+    std::println("Statements:");
+    for (usize i = 0; i < statements.size(); ++i) {
+        std::println("[{:03}]\n{}", i, statements[i]);
+    }
+    std::println();
+}
+
 int main() {
     using namespace ds_lang;
+    run_struct_example();
+
+    return 0;
 
     std::string code = load_code("examples/simple.ds");
 

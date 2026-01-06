@@ -21,7 +21,9 @@ using usize = std::size_t;
 using isize = std::ptrdiff_t;
 
 using IPtr = usize; // Instruction Pointer
-constexpr usize INVALIDIPtr = std::numeric_limits<IPtr>::max();
+constexpr IPtr INVALIDIPtr = std::numeric_limits<IPtr>::max();
+
+constexpr i64 UNINIALISED_VALUE = std::numeric_limits<i64>::max();
 
 #if defined(__cpp_lib_stdfloat)
 using f32 = std::float32_t;

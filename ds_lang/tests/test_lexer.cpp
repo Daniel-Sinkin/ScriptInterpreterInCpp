@@ -31,6 +31,15 @@ static void expect_token(
     EXPECT_EQ(t.column, column);
 }
 
+static void test_struct_keyword() {
+    const auto tokens = lex("struct Foo { int a; int b; }");
+    bool saw_struct = false;
+    for (const auto& t : tokens) {
+        if (t.kind == TokenKind::KWStruct) saw_struct = true;
+    }
+    EXPECT_TRUE(saw_struct);
+}
+
 static void test_basic_two_lines() {
     const std::string code = "int x = 1;print x";
     const auto tokens = lex(code);
@@ -140,10 +149,6 @@ static void test_eof_only_once_and_at_end() {
     EXPECT_EQ(eof_count, 1);
     EXPECT_EQ(tokens.back().kind, TokenKind::Eof);
 }
-
-// ----------------------------------------------------------------------------
-// Extra lexer coverage (not referenced by your current CMake LEXER_TEST_CASES)
-// ----------------------------------------------------------------------------
 
 static void test_tokenize_range_absolute_line_col() {
     const std::string code = "int x = 1;print x";
@@ -262,8 +267,7 @@ int main(int argc, char **argv) {
         {"starts_with_zero_throws", test_starts_with_zero_throws},
         {"overflow_throws", test_overflow_throws},
         {"eof_only_once_and_at_end", test_eof_only_once_and_at_end},
-
-        // Extra cases (not in CMake's LEXER_TEST_CASES by default)
+        {"struct_keyword", test_struct_keyword},
         {"tokenize_range_absolute_line_col", test_tokenize_range_absolute_line_col},
         {"two_char_operators", test_two_char_operators},
         {"keyword_prefix_is_identifier", test_keyword_prefix_is_identifier},

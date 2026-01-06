@@ -70,18 +70,21 @@ struct Expression {
         UnaryExpression,
         BinaryExpression,
         CallExpression>;
-
     Variant node;
 };
 
 struct Statement;
 
-struct IntDeclarationStatement { // int x = 1;
+struct IntDeclarationAssignmentStatement { // int x = 1;
     std::string identifier;
     std::unique_ptr<Expression> expr;
 };
 
-struct IntAssignmentStatement { // x = 1; // after int x = (...) as been executed before
+struct IntDeclarationStatement { // int x;
+    std::string identifier;
+};
+
+struct IntAssignmentStatement { // x = 1;
     std::string identifier;
     std::unique_ptr<Expression> expr;
 };
@@ -119,8 +122,14 @@ struct FunctionStatement {
     std::vector<Statement> statements;
 };
 
+struct StructStatement {
+    std::string struct_name;
+    std::vector<std::string> vars; // currently: field names only (all are "int" implicitly)
+};
+
 struct Statement {
     using Variant = std::variant<
+        IntDeclarationAssignmentStatement,
         IntDeclarationStatement,
         IntAssignmentStatement,
         PrintStatement,
@@ -129,6 +138,7 @@ struct Statement {
         IfStatement,
         WhileStatement,
         FunctionStatement,
+        StructStatement,
         ScopeStatement>;
     Variant node;
 };
@@ -145,10 +155,16 @@ public:
     static constexpr int kUnaryPrec = 80;
     static constexpr int kCallPrec = 90;
 
-    [[nodiscard]] std::vector<Statement> parse_program(); // Parse statements until you see an END or EOF
+    // Program is a sequence of *top-level declarations*:
+    // - func ...
+    // - struct ...
+    [[nodiscard]] std::vector<Statement> parse_program();
 
+    // "Normal" statements allowed inside { ... } blocks (no struct allowed).
     [[nodiscard]] Statement parse_statement();
-    [[nodiscard]] std::vector<Statement> parse_scope(); // Scope == { ... }
+    [[nodiscard]] std::vector<Statement> parse_scope();
+
+    [[nodiscard]] IntDeclarationAssignmentStatement parse_int_declaration_assignment_statement();
     [[nodiscard]] IntDeclarationStatement parse_int_declaration_statement();
     [[nodiscard]] IntAssignmentStatement parse_int_assignment_statement();
     [[nodiscard]] PrintStatement parse_print_statement();
@@ -158,10 +174,15 @@ public:
     [[nodiscard]] IfStatement parse_if_statement();
     [[nodiscard]] WhileStatement parse_while_statement();
     [[nodiscard]] FunctionStatement parse_func_statement();
+    [[nodiscard]] StructStatement parse_struct_statement();
 
 private:
     const std::vector<Token> &tokens_;
     usize pos_;
+
+    enum class Context { TopLevel,
+                         Block };
+    Context ctx_{Context::TopLevel};
 
     [[nodiscard]] std::unique_ptr<Expression> parse_expression();
 

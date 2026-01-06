@@ -1,0 +1,7 @@
+struct A {
+    int x;
+}
+
+func main() {
+    return 0;
+}

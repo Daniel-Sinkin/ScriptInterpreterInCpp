@@ -47,15 +47,41 @@ static const T &expect_expr_is(const Expression &e) {
     return *p;
 }
 
-// ----------------------------------------------------------------------------
-// Parser test cases
-// ----------------------------------------------------------------------------
+static std::vector<Statement> parse_program_code(std::string_view code) {
+    const auto tokens = ds_lang::Lexer{code}.tokenize_all();
+    ds_lang::Parser p{tokens};
+    return p.parse_program();
+}
+
+static void test_struct_statement_structure() {
+    const auto program = parse_program_code("struct Foo { int a; int b; } func main() { return 0; }");
+    EXPECT_EQ(program.size(), static_cast<std::size_t>(2));
+
+    const auto* st = std::get_if<StructStatement>(&program[0].node);
+    EXPECT_TRUE(st != nullptr);
+    EXPECT_EQ(st->struct_name, "Foo");
+    EXPECT_EQ(st->vars.size(), static_cast<std::size_t>(2));
+    EXPECT_EQ(st->vars[0], "a");
+    EXPECT_EQ(st->vars[1], "b");
+}
+
+static void test_struct_not_allowed_in_function_scope() {
+    EXPECT_THROW(parse_program_code(
+        "func main() { struct X { int a; } return 0; }"
+    ));
+}
+
+static void test_top_level_only_allows_func_and_struct() {
+    EXPECT_THROW(parse_program_code("int x = 1;"));
+    EXPECT_THROW(parse_program_code("print 1;"));
+    EXPECT_THROW(parse_program_code("{ int x = 1; }"));
+}
 
 static void test_int_declaration() {
     const auto statements = parse_block("int x = 123;");
     EXPECT_EQ(statements.size(), static_cast<std::size_t>(1));
 
-    const auto &st = expect_stmt_is<IntDeclarationStatement>(statements[0]);
+    const auto &st = expect_stmt_is<IntDeclarationAssignmentStatement>(statements[0]);
     EXPECT_EQ(st.identifier, "x");
 
     const auto &e = expect_expr_ptr(st.expr);
@@ -283,7 +309,7 @@ static void test_skip_extra_eos_inside_scope() {
     const auto statements = parse_block(";;;int x = 1;;;;print x;;;");
     EXPECT_EQ(statements.size(), static_cast<std::size_t>(2));
 
-    (void)expect_stmt_is<IntDeclarationStatement>(statements[0]);
+    (void)expect_stmt_is<IntDeclarationAssignmentStatement>(statements[0]);
     (void)expect_stmt_is<PrintStatement>(statements[1]);
 }
 
@@ -356,6 +382,9 @@ int main(int argc, char **argv) {
         {"scope_statement_formatting", test_scope_statement_formatting},
         {"missing_expression_throws", test_missing_expression_throws},
         {"missing_rbrace_throws", test_missing_rbrace_throws},
+        {"struct_statement_structure", test_struct_statement_structure},
+        {"struct_not_allowed_in_function_scope", test_struct_not_allowed_in_function_scope},
+        {"top_level_only_allows_func_and_struct", test_top_level_only_allows_func_and_struct},
     };
 
     std::string_view only;

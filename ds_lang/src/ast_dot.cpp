@@ -15,11 +15,12 @@
 namespace ds_lang::AstDot {
 namespace {
 
-constexpr std::string_view kFillDefault    = "#ffffff";
-constexpr std::string_view kFillControl    = "#f2f2f2";
+constexpr std::string_view kFillDefault = "#ffffff";
+constexpr std::string_view kFillControl = "#f2f2f2";
+constexpr std::string_view kFillStruct = "#e6dcf5";
 constexpr std::string_view kFillIdentifier = "#cfe8ff";
-constexpr std::string_view kFillInteger    = "#d6f5d6";
-constexpr std::string_view kFillOperator   = "#ffe8c7";
+constexpr std::string_view kFillInteger = "#d6f5d6";
+constexpr std::string_view kFillOperator = "#ffe8c7";
 
 [[nodiscard]] std::string dot_escape(std::string_view s) {
     std::string out;
@@ -27,14 +28,25 @@ constexpr std::string_view kFillOperator   = "#ffe8c7";
 
     for (char c : s) {
         switch (c) {
-        case '\\': out += "\\\\"; break;
-        case '"':  out += "\\\""; break;
-        case '\n': out += "\\n"; break;
-        case '\r': break; // ignore
-        case '\t': out += "\\t"; break;
+        case '\\':
+            out += "\\\\";
+            break;
+        case '"':
+            out += "\\\"";
+            break;
+        case '\n':
+            out += "\\n";
+            break;
+        case '\r':
+            break; // ignore
+        case '\t':
+            out += "\\t";
+            break;
         default:
-            if (static_cast<unsigned char>(c) < 0x20) out += ' ';
-            else out += c;
+            if (static_cast<unsigned char>(c) < 0x20)
+                out += ' ';
+            else
+                out += c;
             break;
         }
     }
@@ -43,27 +55,42 @@ constexpr std::string_view kFillOperator   = "#ffe8c7";
 
 [[nodiscard]] std::string_view to_string(BinaryOp op) noexcept {
     switch (op) {
-    case BinaryOp::Add: return "+";
-    case BinaryOp::Sub: return "-";
-    case BinaryOp::Mul: return "*";
-    case BinaryOp::Div: return "/";
-    case BinaryOp::Mod: return "%";
-    case BinaryOp::Eq:  return "==";
-    case BinaryOp::Neq: return "!=";
-    case BinaryOp::Lt:  return "<";
-    case BinaryOp::Le:  return "<=";
-    case BinaryOp::Gt:  return ">";
-    case BinaryOp::Ge:  return ">=";
-    case BinaryOp::And: return "&&";
-    case BinaryOp::Or:  return "||";
+    case BinaryOp::Add:
+        return "+";
+    case BinaryOp::Sub:
+        return "-";
+    case BinaryOp::Mul:
+        return "*";
+    case BinaryOp::Div:
+        return "/";
+    case BinaryOp::Mod:
+        return "%";
+    case BinaryOp::Eq:
+        return "==";
+    case BinaryOp::Neq:
+        return "!=";
+    case BinaryOp::Lt:
+        return "<";
+    case BinaryOp::Le:
+        return "<=";
+    case BinaryOp::Gt:
+        return ">";
+    case BinaryOp::Ge:
+        return ">=";
+    case BinaryOp::And:
+        return "&&";
+    case BinaryOp::Or:
+        return "||";
     }
     return "<?>";
 }
 
 [[nodiscard]] std::string_view to_string(UnaryOp op) noexcept {
     switch (op) {
-    case UnaryOp::Neg: return "-";
-    case UnaryOp::Not: return "!";
+    case UnaryOp::Neg:
+        return "-";
+    case UnaryOp::Not:
+        return "!";
     }
     return "<?>";
 }
@@ -101,10 +128,10 @@ struct DotBuilder {
     }
 };
 
-[[nodiscard]] u32 emit_expression(DotBuilder& b, const Expression* e);
+[[nodiscard]] u32 emit_expression(DotBuilder &b, const Expression *e);
 
 [[nodiscard]] u32 emit_identifier_node(
-    DotBuilder& b,
+    DotBuilder &b,
     std::string_view name,
     std::string_view edge_label,
     u32 parent) {
@@ -113,50 +140,55 @@ struct DotBuilder {
     return id;
 }
 
-[[nodiscard]] u32 emit_scope(DotBuilder& b, std::string_view label, const std::vector<Statement>& scope);
+[[nodiscard]] u32 emit_scope(DotBuilder &b, std::string_view label, const std::vector<Statement> &scope);
 
-[[nodiscard]] u32 emit_statement(DotBuilder& b, const Statement& st) {
+[[nodiscard]] u32 emit_statement(DotBuilder &b, const Statement &st) {
     return std::visit(
         overloaded{
-            [&](const IntDeclarationStatement& s) -> u32 {
+            [&](const IntDeclarationAssignmentStatement &s) -> u32 {
                 const u32 n = b.add_node("IntDecl", kFillControl, "box");
                 (void)emit_identifier_node(b, s.identifier, "name", n);
                 const u32 expr = emit_expression(b, s.expr.get());
                 b.add_edge(n, expr, "init");
                 return n;
             },
-            [&](const IntAssignmentStatement& s) -> u32 {
+            [&](const IntDeclarationStatement&s) -> u32 {
+                const u32 n = b.add_node("Assign", kFillControl, "box");
+                (void)emit_identifier_node(b, s.identifier, "name", n);
+                return n;
+            },
+            [&](const IntAssignmentStatement &s) -> u32 {
                 const u32 n = b.add_node("Assign", kFillControl, "box");
                 (void)emit_identifier_node(b, s.identifier, "name", n);
                 const u32 expr = emit_expression(b, s.expr.get());
                 b.add_edge(n, expr, "value");
                 return n;
             },
-            [&](const PrintStatement& s) -> u32 {
+            [&](const PrintStatement &s) -> u32 {
                 const u32 n = b.add_node("Print", kFillControl, "box");
                 const u32 expr = emit_expression(b, s.expr.get());
                 b.add_edge(n, expr, "value");
                 return n;
             },
-            [&](const PrintStringStatement& s) -> u32 {
+            [&](const PrintStringStatement &s) -> u32 {
                 // Show it as a literal-ish node.
                 // Lexer stores content without quotes; we add quotes for display.
                 const u32 n = b.add_node(std::format("PrintString\n\"{}\"", s.content), kFillControl, "box");
                 return n;
             },
-            [&](const ReturnStatement& s) -> u32 {
+            [&](const ReturnStatement &s) -> u32 {
                 const u32 n = b.add_node("Return", kFillControl, "box");
                 const u32 expr = emit_expression(b, s.expr.get());
                 b.add_edge(n, expr, "value");
                 return n;
             },
-            [&](const ScopeStatement& s) -> u32 {
+            [&](const ScopeStatement &s) -> u32 {
                 const u32 n = b.add_node("Scope", kFillControl, "box");
                 const u32 inner = emit_scope(b, "ScopeBody", s.scope);
                 b.add_edge(n, inner, "body");
                 return n;
             },
-            [&](const IfStatement& s) -> u32 {
+            [&](const IfStatement &s) -> u32 {
                 const u32 n = b.add_node("If", kFillControl, "box");
                 const u32 cond = emit_expression(b, s.if_expr.get());
                 b.add_edge(n, cond, "cond");
@@ -168,7 +200,7 @@ struct DotBuilder {
                 }
                 return n;
             },
-            [&](const WhileStatement& s) -> u32 {
+            [&](const WhileStatement &s) -> u32 {
                 const u32 n = b.add_node("While", kFillControl, "box");
                 const u32 cond = emit_expression(b, s.while_expr.get());
                 b.add_edge(n, cond, "cond");
@@ -176,7 +208,7 @@ struct DotBuilder {
                 b.add_edge(n, body, "body");
                 return n;
             },
-            [&](const FunctionStatement& s) -> u32 {
+            [&](const FunctionStatement &s) -> u32 {
                 const u32 n = b.add_node("Function", kFillControl, "box");
                 (void)emit_identifier_node(b, s.func_name, "name", n);
 
@@ -191,11 +223,28 @@ struct DotBuilder {
                 b.add_edge(n, body, "body");
                 return n;
             },
+            [&](const StructStatement &s) -> u32 {
+                const u32 n = b.add_node("Struct", kFillStruct, "box");
+                (void)emit_identifier_node(b, s.struct_name, "name", n);
+
+                const u32 params = b.add_node("Params", kFillControl, "box");
+                b.add_edge(n, params, "params");
+                for (usize var_idx = 0; var_idx < s.vars.size(); ++var_idx) {
+                    const u32 var_identifier = b.add_node(
+                        std::format(
+                            "Var\n{}",
+                            s.vars[var_idx]),
+                        kFillIdentifier,
+                        "box");
+                    b.add_edge(params, var_identifier, std::format("{}", var_idx));
+                }
+                return n;
+            },
         },
         st.node);
 }
 
-[[nodiscard]] u32 emit_scope(DotBuilder& b, std::string_view label, const std::vector<Statement>& scope) {
+[[nodiscard]] u32 emit_scope(DotBuilder &b, std::string_view label, const std::vector<Statement> &scope) {
     const u32 sid = b.add_node(label, kFillControl, "box");
     for (usize i = 0; i < scope.size(); ++i) {
         const u32 child = emit_statement(b, scope[i]);
@@ -204,26 +253,26 @@ struct DotBuilder {
     return sid;
 }
 
-[[nodiscard]] u32 emit_expression(DotBuilder& b, const Expression* e) {
+[[nodiscard]] u32 emit_expression(DotBuilder &b, const Expression *e) {
     if (!e) {
         return b.add_node("<null-expr>", kFillDefault, "box");
     }
 
     return std::visit(
         overloaded{
-            [&](const IntegerExpression& n) -> u32 {
+            [&](const IntegerExpression &n) -> u32 {
                 return b.add_node(std::format("Int\n{}", n.value), kFillInteger, "box");
             },
-            [&](const IdentifierExpression& id) -> u32 {
+            [&](const IdentifierExpression &id) -> u32 {
                 return b.add_node(std::format("Id\n{}", id.name), kFillIdentifier, "box");
             },
-            [&](const UnaryExpression& u) -> u32 {
+            [&](const UnaryExpression &u) -> u32 {
                 const u32 n = b.add_node(std::format("Unary\n{}", to_string(u.op)), kFillOperator, "ellipse");
                 const u32 rhs = emit_expression(b, u.rhs.get());
                 b.add_edge(n, rhs, "rhs");
                 return n;
             },
-            [&](const BinaryExpression& bin) -> u32 {
+            [&](const BinaryExpression &bin) -> u32 {
                 const u32 n = b.add_node(std::format("Binary\n{}", to_string(bin.op)), kFillOperator, "ellipse");
                 const u32 lhs = emit_expression(b, bin.lhs.get());
                 const u32 rhs = emit_expression(b, bin.rhs.get());
@@ -231,7 +280,7 @@ struct DotBuilder {
                 b.add_edge(n, rhs, "rhs");
                 return n;
             },
-            [&](const CallExpression& c) -> u32 {
+            [&](const CallExpression &c) -> u32 {
                 const u32 n = b.add_node("Call", kFillDefault, "box");
                 const u32 callee = emit_expression(b, c.callee.get());
                 b.add_edge(n, callee, "callee");
@@ -247,7 +296,7 @@ struct DotBuilder {
 
 } // namespace
 
-std::string to_dot(const std::vector<Statement>& program) {
+std::string to_dot(const std::vector<Statement> &program) {
     DotBuilder b;
 
     std::string header;
@@ -271,7 +320,7 @@ std::string to_dot(const std::vector<Statement>& program) {
     return result;
 }
 
-void write_dot_file(std::string_view path, const std::vector<Statement>& program) {
+void write_dot_file(std::string_view path, const std::vector<Statement> &program) {
     std::ofstream f(std::string(path), std::ios::out | std::ios::trunc);
     if (!f) {
         throw std::runtime_error(std::format("Failed to open DOT output file: {}", path));
