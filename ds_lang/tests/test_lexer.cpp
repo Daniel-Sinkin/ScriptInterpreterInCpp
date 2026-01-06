@@ -181,8 +181,8 @@ static void test_two_char_operators() {
     for (const auto &t : tokens) {
         saw_eqeq |= (t.kind == TokenKind::OpEqEq);
         saw_neq |= (t.kind == TokenKind::OpNeq);
-        saw_andand |= (t.kind == TokenKind::OpAndAnd);
-        saw_oror |= (t.kind == TokenKind::OpOrOr);
+        saw_andand |= (t.kind == TokenKind::OpAnd);
+        saw_oror |= (t.kind == TokenKind::OpOr);
         saw_le |= (t.kind == TokenKind::OpLe);
         saw_ge |= (t.kind == TokenKind::OpGe);
     }

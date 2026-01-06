@@ -8,7 +8,7 @@
 #include <string_view>
 #include <vector>
 
-#include "parser.hpp" // for Statement/Expression nodes + ops
+#include "parser.hpp"
 #include "types.hpp"
 #include "util.hpp"
 

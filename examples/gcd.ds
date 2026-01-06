@@ -8,7 +8,7 @@ func gcd(a, b) {
 }
 
 func lcm(a, b) {
-    if (a == 0 || b == 0) {
+    if (a == 0 or b == 0) {
         return 0;
     } else {
         return (a / gcd(a, b)) * b;

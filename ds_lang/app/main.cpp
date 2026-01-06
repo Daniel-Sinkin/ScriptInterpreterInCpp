@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-#include "ast_dot.hpp"      // <-- add
+#include "ast_dot.hpp"
 #include "formatters.hpp"
 #include "lexer.hpp"
 #include "parser.hpp"
@@ -14,7 +14,7 @@
 int main() {
     using namespace ds_lang;
 
-    std::string code = load_code("examples/gcd.ds");
+    std::string code = load_code("examples/simple.ds");
 
     std::vector<Token> tokens = Lexer{code}.tokenize_all();
     std::vector<Statement> statements = Parser{tokens}.parse_program();

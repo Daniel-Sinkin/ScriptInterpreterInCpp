@@ -17,6 +17,8 @@ enum class TokenKind {
     KWIf,       // if
     KWElse,     // else
     KWWhile,    // while
+    KWTrue,     // true
+    KWFalse,    // false
 
     LParen,     // (
     RParen,     // )
@@ -38,8 +40,8 @@ enum class TokenKind {
     OpLe,       // <=
     OpGt,       // >
     OpGe,       // >=
-    OpAndAnd,   // &&
-    OpOrOr,     // ||
+    OpAnd,      // and
+    OpOr,       // or
     OpBang,     // !
 
     Eos,        // end of statement
@@ -76,6 +78,10 @@ constexpr std::string_view to_string(TokenKind k) noexcept {
         return "KWElse";
     case TokenKind::KWWhile:
         return "KWWhile";
+    case TokenKind::KWTrue:
+        return "KWTrue";
+    case TokenKind::KWFalse:
+        return "KWFalse";
 
     case TokenKind::LParen:
         return "LParen";
@@ -116,10 +122,10 @@ constexpr std::string_view to_string(TokenKind k) noexcept {
         return "OpGt";
     case TokenKind::OpGe:
         return "OpGe";
-    case TokenKind::OpAndAnd:
-        return "OpAndAnd";
-    case TokenKind::OpOrOr:
-        return "OpOrOr";
+    case TokenKind::OpAnd:
+        return "OpAnd";
+    case TokenKind::OpOr:
+        return "OpOr";
     case TokenKind::OpBang:
         return "OpBang";
 
@@ -154,6 +160,10 @@ constexpr std::string_view explain(TokenKind k) noexcept {
         return "Keyword introducing the else-branch.";
     case TokenKind::KWWhile:
         return "Keyword starting a while loop.";
+    case TokenKind::KWTrue:
+        return "Keyword for 1.";
+    case TokenKind::KWFalse:
+        return "Keyword for 0.";
 
     case TokenKind::LParen:
         return "Left parenthesis '('.";
@@ -194,10 +204,10 @@ constexpr std::string_view explain(TokenKind k) noexcept {
         return "Greater-than comparison operator '>'.";
     case TokenKind::OpGe:
         return "Greater-than-or-equal comparison operator '>='.";
-    case TokenKind::OpAndAnd:
-        return "Logical AND operator '&&'.";
-    case TokenKind::OpOrOr:
-        return "Logical OR operator '||'.";
+    case TokenKind::OpAnd:
+        return "Logical AND operator 'and'.";
+    case TokenKind::OpOr:
+        return "Logical OR operator 'or'.";
     case TokenKind::OpBang:
         return "Logical NOT operator '!'.";
 

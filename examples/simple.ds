@@ -1,12 +1,25 @@
-func square(a) {
-    print "square";
-    print "a = ";
-    print a;
-    return a * a;
+func is_even(x) {
+    return (x % 2) == 0;
+}
+
+func collatz(x) {
+    if(is_even(x)) {
+        return x / 2;
+    } else {
+        return 3 * x + 1;
+    }
 }
 
 func main() {
-    print "main";
-    int x = square(5);
-    return x;
+    int x = 13;
+    int iter = 0;
+    while (true) {
+        x = collatz(x);
+        print(x);
+        if (x <= 1) {
+            print "Reached the end!";
+            return 0;
+        }
+        iter = iter + 1;
+    }
 }

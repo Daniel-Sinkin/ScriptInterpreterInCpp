@@ -32,6 +32,8 @@ static TokenKind keyword_or_identifier(std::string_view s) {
     if (s == "if")     return TokenKind::KWIf;
     if (s == "else")   return TokenKind::KWElse;
     if (s == "while")  return TokenKind::KWWhile;
+    if (s == "true")   return TokenKind::KWTrue;
+    if (s == "false")  return TokenKind::KWFalse;
     // clang-format on
     return TokenKind::Identifier;
 }
@@ -165,6 +167,20 @@ std::vector<Token> Lexer::tokenize_range(usize left, usize right) const {
             continue;
         }
 
+        if(pos + 2 < right) {
+            const char a = code_[pos];
+            const char b = code_[pos + 1];
+            const char c = code_[pos + 2];
+
+            if(a == 'a' && b == 'n' && c == 'd') {
+                emit(TokenKind::OpAnd, start, 3, tok_line, tok_col);
+                new_char();
+                new_char();
+                new_char();
+                continue;
+            }
+        }
+
         if (pos + 1 < right) {
             const char a = code_[pos];
             const char b = code_[pos + 1];
@@ -193,14 +209,8 @@ std::vector<Token> Lexer::tokenize_range(usize left, usize right) const {
                 new_char();
                 continue;
             }
-            if (a == '&' && b == '&') {
-                emit(TokenKind::OpAndAnd, start, 2, tok_line, tok_col);
-                new_char();
-                new_char();
-                continue;
-            }
-            if (a == '|' && b == '|') {
-                emit(TokenKind::OpOrOr, start, 2, tok_line, tok_col);
+            if (a == 'o' && b == 'r') {
+                emit(TokenKind::OpOr, start, 2, tok_line, tok_col);
                 new_char();
                 new_char();
                 continue;

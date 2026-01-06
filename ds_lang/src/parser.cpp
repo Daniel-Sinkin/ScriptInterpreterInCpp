@@ -1,7 +1,6 @@
 // ds_lang/src/parser.cpp
 #include <algorithm>
 #include <format>
-#include <iterator>
 #include <memory>
 #include <stdexcept>
 #include <string_view>
@@ -77,9 +76,9 @@ void Parser::error_here(std::string_view msg) const {
 
 int Parser::infix_lbp(TokenKind k) noexcept {
     switch (k) {
-    case TokenKind::OpOrOr:
+    case TokenKind::OpOr:
         return 20;
-    case TokenKind::OpAndAnd:
+    case TokenKind::OpAnd:
         return 30;
 
     case TokenKind::OpEqEq:
@@ -144,9 +143,9 @@ BinaryOp Parser::to_binary_op(TokenKind k) {
     case TokenKind::OpGe:
         return BinaryOp::Ge;
 
-    case TokenKind::OpAndAnd:
+    case TokenKind::OpAnd:
         return BinaryOp::And;
-    case TokenKind::OpOrOr:
+    case TokenKind::OpOr:
         return BinaryOp::Or;
     default:
         throw std::runtime_error(std::format("TokenKind {} is not valid for to_binary_op.", k));
@@ -230,6 +229,11 @@ std::unique_ptr<Expression> Parser::parse_expr_bp(int min_bp) {
     return lhs;
 }
 
+static std::unique_ptr<Expression> make_int_literal(i64 v) {
+    auto e = std::make_unique<Expression>();
+    e->node = IntegerExpression{.value = v};
+    return e;
+}
 
 std::unique_ptr<Expression> Parser::nud(const Token &t) {
     // prefix operators
@@ -251,9 +255,13 @@ std::unique_ptr<Expression> Parser::nud(const Token &t) {
                 "Invalid integer literal {:?}: {} [{}] at line={},column={}",
                 t.lexeme, explain(err), to_string(err), t.line, t.column));
         }
-        auto e = std::make_unique<Expression>();
-        e->node = IntegerExpression{.value = *v};
-        return e;
+        return make_int_literal(*v);
+    }
+    case TokenKind::KWTrue: {
+        return make_int_literal(1);
+    }
+    case TokenKind::KWFalse: {
+        return make_int_literal(0);
     }
     case TokenKind::Identifier: {
         auto e = std::make_unique<Expression>();
@@ -265,6 +273,7 @@ std::unique_ptr<Expression> Parser::nud(const Token &t) {
         (void)consume(TokenKind::RParen, "Expected ')' after parenthesized expression");
         return inner;
     }
+
     default:
         throw std::runtime_error(std::format(
             "Expected expression, got {} {:?} at line={},column={}",
@@ -277,8 +286,6 @@ Statement Parser::parse_statement() {
     if (at_end()) {
         throw std::runtime_error("Trying to parse statement at the end");
     }
-
-
 
     TokenKind k = peek().kind;
     if (k == TokenKind::KWInt) {
