@@ -63,13 +63,19 @@ struct CallExpression {
     std::vector<std::unique_ptr<Expression>> args;
 };
 
+struct StructAccessExpression {
+    std::unique_ptr<Expression> lhs;
+    std::string field_name;
+};
+
 struct Expression {
     using Variant = std::variant<
         IntegerExpression,
         IdentifierExpression,
         UnaryExpression,
         BinaryExpression,
-        CallExpression>;
+        CallExpression,
+        StructAccessExpression>;
     Variant node;
 };
 
@@ -143,9 +149,10 @@ struct StructAssignmentStatement {
     std::vector<Expression> exprs;
 };
 
-struct StructVariableScope {
+struct StructVariableScopeStatement {
     std::vector<Expression> exprs;
 };
+
 
 struct Statement {
     using Variant = std::variant<
@@ -176,6 +183,7 @@ public:
 
     static constexpr int kUnaryPrec = 80;
     static constexpr int kCallPrec = 90;
+    static constexpr int kAccessPrec = 100;
 
     // Program is a sequence of *top-level declarations*:
     // - func ...
@@ -196,7 +204,7 @@ public:
     [[nodiscard]] IfStatement parse_if_statement();
     [[nodiscard]] WhileStatement parse_while_statement();
     [[nodiscard]] FunctionStatement parse_func_statement();
-    [[nodiscard]] StructVariableScope parse_struct_variable_scope_statement();
+    [[nodiscard]] StructVariableScopeStatement parse_struct_variable_scope_statement();
     [[nodiscard]] StructStatement parse_struct_statement();
     [[nodiscard]] StructDeclarationAssignmentStatement parse_struct_declaration_assignment_statement();
     [[nodiscard]] StructDeclarationStatement parse_struct_declaration_statement();

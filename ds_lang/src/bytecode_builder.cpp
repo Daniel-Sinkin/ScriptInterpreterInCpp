@@ -2,6 +2,7 @@
 #include "bytecode_builder.hpp"
 
 #include <algorithm>
+#include <iterator>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -262,6 +263,12 @@ void BytecodeBuilder::build_expression(const Expression &expr) {
                 else
                     emit(BytecodeCallArgs{fid, argc});
             },
+            [&](const StructAccessExpression &e) {
+                if (!e.lhs) {
+                    throw std::runtime_error("StructAccessExpression missing lhs");
+                }
+                throw std::runtime_error("Struct field access is not supported by BytecodeBuilder yet");
+            }
         },
         expr.node);
 }
@@ -278,7 +285,7 @@ void BytecodeBuilder::build_statement(const Statement &st) {
             },
             [&](const IntDeclarationStatement &s) {
                 const u32 slot = declare_local(s.identifier);
-                emit(BytecodePushI64{.value = UNINIALISED_VALUE});
+                emit(BytecodePushI64{.value = UNINITIALISED_VALUED});
                 emit(BytecodeStoreLocal{slot});
             },
             [&](const IntAssignmentStatement &s) {
@@ -363,9 +370,10 @@ void BytecodeBuilder::build_statement(const Statement &st) {
             [&](const StructAssignmentStatement &) -> void {
                 std::unreachable();
             },
-            [&](const StructVariableScope &) -> void {
+            [&](const StructVariableScopeStatement &) -> void {
                 std::unreachable();
-            }},
+            },
+        },
         st.node);
 }
 

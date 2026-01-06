@@ -13,7 +13,7 @@ enum class TokenKind {
     KWInt,      // int
     KWPrint,    // print
     KWFunc,     // func
-    KWStruct,     // struct
+    KWStruct,   // struct
     KWReturn,   // return
     KWIf,       // if
     KWElse,     // else
@@ -44,6 +44,7 @@ enum class TokenKind {
     OpAnd,      // and
     OpOr,       // or
     OpBang,     // !
+    OpPeriod,   // .
 
     Eos,        // end of statement
     Eof         // end of input
@@ -131,6 +132,8 @@ constexpr std::string_view to_string(TokenKind k) noexcept {
         return "OpOr";
     case TokenKind::OpBang:
         return "OpBang";
+    case TokenKind::OpPeriod:
+        return "OpPeriod";
 
     case TokenKind::Eos:
         return "Eos";
@@ -215,6 +218,8 @@ constexpr std::string_view explain(TokenKind k) noexcept {
         return "Logical OR operator 'or'.";
     case TokenKind::OpBang:
         return "Logical NOT operator '!'.";
+    case TokenKind::OpPeriod:
+        return "Period operator '.'.";
 
     case TokenKind::Eos:
         return "';' token that terminates a statement.";

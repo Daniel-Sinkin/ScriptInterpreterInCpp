@@ -24,19 +24,18 @@ void run_struct_example() {
     }
     std::println();
 
-    std::vector<Statement> statements = Parser{tokens}.parse_program();
+    std::vector<Statement> program = Parser{tokens}.parse_program();
     std::println("Statements:");
-    for (usize i = 0; i < statements.size(); ++i) {
-        std::println("[{:03}]\n{}", i, statements[i]);
+    for (usize i = 0; i < program.size(); ++i) {
+        std::println("[{:03}]\n{}", i, program[i]);
     }
     std::println();
+    AstDot::write_dot_file("struct.dot", program);
 }
 
 int main() {
     using namespace ds_lang;
     run_struct_example();
-
-    return 0;
 
     std::string code = load_code("examples/simple.ds");
 

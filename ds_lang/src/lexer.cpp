@@ -277,6 +277,10 @@ std::vector<Token> Lexer::tokenize_range(usize left, usize right) const {
             emit(TokenKind::OpBang, start, 1, tok_line, tok_col);
             new_char();
             continue;
+        case '.':
+            emit(TokenKind::OpPeriod, start, 1, tok_line, tok_col);
+            new_char();
+            continue;
         case '<':
             emit(TokenKind::OpLt, start, 1, tok_line, tok_col);
             new_char();

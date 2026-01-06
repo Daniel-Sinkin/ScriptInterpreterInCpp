@@ -194,6 +194,12 @@ static void format_expr_into(std::string &out, const Expression &e, int parent_p
                     out += ")";
                 }
             },
+            [&](const StructAccessExpression& a) -> void {
+                if (a.lhs) format_expr_into(out, *a.lhs, Parser::kAccessPrec, false);
+                else out += "<null-expr>";
+                out += ".";
+                out += a.field_name;
+            }
         },
         e.node);
 }
@@ -355,20 +361,31 @@ static void format_statement_into(std::string &out, const Statement &s, int inde
                 }
                 out += "}";
             },
-            [&](const StructDeclarationStatement &) {
-                std::unreachable();
+            [&](const StructDeclarationStatement &st) {
+                out += st.struct_name;
+                out += " ";
+                out += st.var_name;
+                out += ";";
             },
-            [&](const StructAssignmentStatement &) {
-                std::unreachable();
+            [&](const StructAssignmentStatement &st) {
+                out += st.var_name;
+                out += " = {";
+                for(usize i = 0; i < st.exprs.size(); ++i) {
+                    out += format_expression(st.exprs[i]);
+                    if(i < st.exprs.size() - 1) {
+                        out += ", ";
+                    }
+                }
+                out += "};";
             },
-            [&](const StructVariableScope &st) {
+            [&](const StructVariableScopeStatement &st) {
                 out += "{";
                 for(const auto& expr: st.exprs) {
                     format_expression(expr);
                     out += ", ";
                 }
                 out += "}";
-            },
+            }
         },
         s.node);
 }

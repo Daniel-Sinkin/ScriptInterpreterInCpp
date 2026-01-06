@@ -14,6 +14,13 @@
 #include "util.hpp"
 
 namespace ds_lang {
+bool adjacent_no_space(const ds_lang::Token &a, const ds_lang::Token &b) {
+    if (a.line != b.line)
+        return false;
+    const int a_end = a.column + static_cast<int>(a.lexeme.size());
+    return b.column == a_end;
+}
+
 bool Parser::at_end() const noexcept {
     return pos_ >= tokens_.size();
 }
@@ -180,6 +187,40 @@ std::unique_ptr<Expression> Parser::parse_expr_bp(int min_bp) {
     while (!at_end()) {
         const TokenKind k = peek().kind;
 
+        if (k == TokenKind::OpPeriod && kAccessPrec >= min_bp) {
+            const Token &lhs_end_tok = previous(); // last consumed token of lhs
+            const Token &dot_tok = peek(0);
+            const Token &field_tok = peek(1);
+
+            if (field_tok.kind != TokenKind::Identifier) {
+                error_here("Expected identifier after '.'");
+            }
+
+            // Enforce no whitespace: lhs_end '.' field
+            if (!adjacent_no_space(lhs_end_tok, dot_tok) || !adjacent_no_space(dot_tok, field_tok)) {
+                error_here("No whitespace allowed around '.' (use a.b)");
+            }
+
+            // Enforce your “LHS must be identifier or access chain” rule:
+            const bool ok_lhs =
+                std::holds_alternative<IdentifierExpression>(lhs->node) ||
+                std::holds_alternative<StructAccessExpression>(lhs->node);
+            if (!ok_lhs) {
+                error_here("Field access lhs must be an identifier or a field access");
+            }
+
+            (void)advance(); // consume '.'
+            (void)advance(); // consume field identifier
+
+            auto e = std::make_unique<Expression>();
+            e->node = StructAccessExpression{
+                .lhs = std::move(lhs),
+                .field_name = std::string(field_tok.lexeme),
+            };
+            lhs = std::move(e);
+            continue;
+        }
+
         if (k == TokenKind::LParen && kCallPrec >= min_bp) { // Handle postfix function calls
             if (!std::holds_alternative<IdentifierExpression>(lhs->node)) {
                 error_here("Only identifiers can be called as functions");
@@ -325,11 +366,11 @@ Statement Parser::parse_statement() {
     if (k == TokenKind::LBrace)
         return {parse_scope_statement()};
 
-    if(pos_ + 1 >= tokens_.size()) {
+    if (pos_ + 1 >= tokens_.size()) {
         error_here("Not enough tokens left to make a valid statement.");
     }
     if (k == TokenKind::Identifier && peek_kind(1) == TokenKind::OpAssign) {
-        if(peek_kind(2) == TokenKind::LBrace) {
+        if (peek_kind(2) == TokenKind::LBrace) {
             return {parse_struct_assignment_statement()};
         } else {
             return {parse_int_assignment_statement()};
@@ -337,7 +378,7 @@ Statement Parser::parse_statement() {
     }
 
     if (k == TokenKind::Identifier && peek_kind(1) == TokenKind::Identifier) {
-        if(peek_kind(2) == TokenKind::OpAssign) {
+        if (peek_kind(2) == TokenKind::OpAssign) {
             return {parse_struct_declaration_assignment_statement()};
         } else if (peek_kind(2) == TokenKind::Eos) {
             return {parse_struct_declaration_statement()};
@@ -561,7 +602,7 @@ StructStatement Parser::parse_struct_statement() {
     };
 }
 
-StructVariableScope Parser::parse_struct_variable_scope_statement() {
+StructVariableScopeStatement Parser::parse_struct_variable_scope_statement() {
     (void)consume(TokenKind::LBrace, "Expected '{' at start of struct variable scope statement");
     std::vector<Expression> exprs;
     while (peek_kind() != TokenKind::RBrace) {
@@ -577,7 +618,7 @@ StructVariableScope Parser::parse_struct_variable_scope_statement() {
         }
     }
     (void)consume(TokenKind::RBrace, "Expected '{' at start of struct variable scope statement");
-    return StructVariableScope{
+    return StructVariableScopeStatement{
         .exprs = std::move(exprs)};
 }
 
@@ -588,8 +629,7 @@ StructDeclarationAssignmentStatement Parser::parse_struct_declaration_assignment
     return {
         .struct_name = std::move(struct_name),
         .var_name = std::move(var_name),
-        .exprs = parse_struct_variable_scope_statement().exprs
-    };
+        .exprs = parse_struct_variable_scope_statement().exprs};
 }
 
 StructDeclarationStatement Parser::parse_struct_declaration_statement() {
@@ -606,8 +646,7 @@ StructAssignmentStatement Parser::parse_struct_assignment_statement() {
     (void)consume(TokenKind::OpAssign, "Expected = sign after var name");
     return {
         .var_name = std::move(var_name),
-        .exprs = parse_struct_variable_scope_statement().exprs
-    };
+        .exprs = parse_struct_variable_scope_statement().exprs};
 }
 
 } // namespace ds_lang
