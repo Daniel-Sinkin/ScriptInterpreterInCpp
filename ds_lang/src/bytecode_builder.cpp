@@ -145,31 +145,30 @@ void BytecodeBuilder::build_expression(const Expression& expr) {
             [&](const BinaryExpression& e) {
                 if (!e.lhs || !e.rhs) throw std::runtime_error("BinaryExpression missing operand");
 
-                // Boolean short-circuit semantics => always yield 0/1
                 if (e.op == BinaryOp::And) {
                     build_expression(*e.lhs);
-                    const IPtr jf = emit(BytecodeJmpFalse{INVALIDIPtr}); // pops lhs
+                    const IPtr jump_false = emit(BytecodeJmpFalse{INVALIDIPtr});
 
                     build_expression(*e.rhs);
                     emit(BytecodeNOT{});
                     emit(BytecodeNOT{});
                     const IPtr jend = emit(BytecodeJmp{INVALIDIPtr});
 
-                    patch_jump(jf, ip());
+                    patch_jump(jump_false, ip());
                     emit(BytecodePushI64{0});
                     patch_jump(jend, ip());
                     return;
                 }
                 if (e.op == BinaryOp::Or) {
                     build_expression(*e.lhs);
-                    const IPtr jt = emit(BytecodeJmpTrue{INVALIDIPtr}); // pops lhs
+                    const IPtr jump_true = emit(BytecodeJmpTrue{INVALIDIPtr}); // pops lhs
 
                     build_expression(*e.rhs);
                     emit(BytecodeNOT{});
                     emit(BytecodeNOT{});
                     const IPtr jend = emit(BytecodeJmp{INVALIDIPtr});
 
-                    patch_jump(jt, ip());
+                    patch_jump(jump_true, ip());
                     emit(BytecodePushI64{1});
                     patch_jump(jend, ip());
                     return;
