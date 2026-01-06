@@ -1,49 +1,20 @@
-// ds_lang/include/formatters.hpp
 #pragma once
 
 #include <format>
 #include <string>
 #include <string_view>
-#include <variant>
+
+#include "bytecode.hpp"
 
 namespace ds_lang {
 struct Expression;
 struct Statement;
-
-struct FunctionBytecode;
-using BytecodeOperation = std::variant<
-    struct BytecodePushI64,
-    struct BytecodeAdd,
-    struct BytecodeSub,
-    struct BytecodeMult,
-    struct BytecodeDiv,
-    struct BytecodeMod,
-    struct BytecodeEQ,
-    struct BytecodeNEQ,
-    struct BytecodeLT,
-    struct BytecodeLE,
-    struct BytecodeGT,
-    struct BytecodeGE,
-    struct BytecodeNEG,
-    struct BytecodeNOT,
-    struct BytecodePop,
-    struct BytecodeLoadLocal,
-    struct BytecodeStoreLocal,
-    struct BytecodeJmp,
-    struct BytecodeJmpFalse,
-    struct BytecodeJmpTrue,
-    struct BytecodeCall,
-    struct BytecodeCallArgs,
-    struct BytecodeReturn,
-    struct BytecodePrint>;
 } // namespace ds_lang
 
 namespace ds_lang::Fmt {
-// Existing:
 std::string format_expression(const Expression& e);
 std::string format_statement(const Statement& s);
 
-// New:
 std::string format_bytecode_operation(const BytecodeOperation& op);
 std::string format_function_bytecode(const FunctionBytecode& fn);
 } // namespace ds_lang::Fmt

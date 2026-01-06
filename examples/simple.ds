@@ -1,3 +1,10 @@
+func square(a) {
+    print a;
+    return a * a;
+}
+
 func main() {
-    return 0;
+    print 0;
+    int x = square(5);
+    return x;
 }

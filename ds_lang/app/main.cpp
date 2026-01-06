@@ -7,6 +7,7 @@
 #include "lexer.hpp"
 #include "parser.hpp"
 #include "util.hpp"
+#include "bytecode_builder.hpp"
 #include "vm.hpp"
 
 static ds_lang::FunctionBytecode build_function_square() {
@@ -117,26 +118,24 @@ int main() {
     };
     std::println();
 
-    std::println("Statements:");
+    std::println("Functions:");
     for(usize i = 0; i < statements.size(); ++i) {
-        std::println("[{:03}] {}", i, statements[i]);
+        std::println("[{:03}]\n{}", i, statements[i]);
     };
     std::println();
 
     BytecodeBuilder builder{};
     builder.build(statements);
 
-    FunctionBytecode f = builder.func_code();
-    std::println("Bytecode:");
-    for (usize i = 0; i < f.code.size(); ++i) {
-        std::println("[{:03}] {}", i, f.code[i]);
-    }
-    std::println();
-
     VirtualMachine vm{true};
-    (void)vm.add_function(f);
-    vm.set_entry_function(0);
+
+    for (const auto& fn : builder.functions()) {
+        (void)vm.add_function(fn);
+    }
+
+    vm.set_entry_function(*builder.entry_function());
     vm.reset();
     vm.run();
+
     std::println("Return Value = {}", vm.get_return_value());
 }

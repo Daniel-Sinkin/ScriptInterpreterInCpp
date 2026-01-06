@@ -9,7 +9,7 @@
 
 #include "parser.hpp"
 #include "util.hpp"
-#include "vm.hpp"
+#include "bytecode.hpp"
 
 namespace ds_lang::Fmt {
 
@@ -300,10 +300,6 @@ std::string format_statement(const Statement& s) {
     format_statement_into(out, s, 0);
     return out;
 }
-
-// -----------------------------------------------------------------------------
-// Bytecode formatting
-// -----------------------------------------------------------------------------
 
 std::string format_bytecode_operation(const BytecodeOperation& op) {
     return std::visit(
