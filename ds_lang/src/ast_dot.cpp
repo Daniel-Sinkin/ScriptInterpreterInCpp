@@ -153,10 +153,6 @@ struct DotBuilder {
         return n;
     }
 
-    // ----------------------------
-    // statements
-    // ----------------------------
-
     NodeId emit_statement(const Statement& stmt)
     {
         return std::visit([&](const auto& s) -> NodeId {
