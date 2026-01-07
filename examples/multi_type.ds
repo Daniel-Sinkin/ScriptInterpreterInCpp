@@ -1,0 +1,21 @@
+func main() {
+    float x = 3.2; // 
+    int y = 2;
+    float z = cast(float, y);
+    int w = 4.1; // no implicit casting so this crashes
+}
+
+int + int = int
+float + int = float
+int + float = float
+float + float = float
+
+No operator overloading
+
+We have native vectorized types
+
+f32x4 x = {1.0, 2.0, 3.0, 4.0};
+f32x4 y = {-1.0, 4.0, 0.0, -2.0};
+
+assert_type(f32x4, x + y);
+

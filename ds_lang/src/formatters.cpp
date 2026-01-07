@@ -359,7 +359,7 @@ static void format_statement_into(std::string &out, const Statement &s, int inde
                         out += ", ";
                     }
                 }
-                out += "}";
+                out += "};";
             },
             [&](const StructDeclarationStatement &st) {
                 out += st.struct_name;

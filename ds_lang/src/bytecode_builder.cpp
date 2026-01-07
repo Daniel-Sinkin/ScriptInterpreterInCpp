@@ -6,6 +6,7 @@
 #include <stdexcept>
 #include <string>
 #include <utility>
+#include <variant>
 
 #include "bytecode.hpp"
 #include "parser.hpp"
@@ -351,9 +352,42 @@ void BytecodeBuilder::build_expression(const Expression &expr) {
                 if (!e.lhs) {
                     throw std::runtime_error("StructAccessExpression missing lhs");
                 }
-                throw std::runtime_error("Struct field access is not supported by BytecodeBuilder yet");
-            }
-        },
+                const auto *lhs_id = std::get_if<IdentifierExpression>(&e.lhs->node);
+                if (!lhs_id) {
+                    throw std::runtime_error("Nested struct access is not supported yet (only x.field)");
+                }
+
+                const std::string key = lhs_id->name;
+
+                const LocalInfo *local_info = nullptr;
+                for (auto it = scopes_.rbegin(); it != scopes_.rend(); ++it) {
+                    const auto f = it->locals.find(key);
+                    if (f != it->locals.end()) {
+                        local_info = &f->second;
+                        break;
+                    }
+                }
+                if (!local_info) {
+                    throw std::runtime_error("Undefined variable: " + key);
+                }
+                if (local_info->kind != LocalInfoKind::Struct) {
+                    throw std::runtime_error("Field access on non-struct variable: " + key);
+                }
+                if (!local_info->struct_name.has_value()) {
+                    throw std::runtime_error("Internal error: struct local missing struct_name: " + key);
+                }
+
+                const StructInfo &si = resolve_struct(*local_info->struct_name);
+
+                const auto it_field = std::find(si.field_names.begin(), si.field_names.end(), e.field_name);
+                if (it_field == si.field_names.end()) {
+                    throw std::runtime_error(
+                        "Unknown field '" + e.field_name + "' on struct type '" + si.name + "'");
+                }
+
+                const u32 offset = static_cast<u32>(std::distance(si.field_names.begin(), it_field));
+                emit(BytecodeLoadLocal{local_info->base_slot + offset});
+            }},
         expr.node);
 }
 
@@ -445,8 +479,32 @@ void BytecodeBuilder::build_statement(const Statement &st) {
             [&](const StructStatement &) -> void {
                 throw std::runtime_error("Structs must not be declared inside of function scopes.");
             },
-            [&](const StructDeclarationAssignmentStatement &) -> void {
-                std::unreachable();
+            [&](const StructDeclarationAssignmentStatement &st) -> void {
+                const StructInfo &si = resolve_struct(st.struct_name);
+
+                if (st.exprs.size() != si.field_names.size()) {
+                    throw std::runtime_error(
+                        "Struct initializer arity mismatch for type '" + st.struct_name +
+                        "': expected " + std::to_string(si.field_names.size()) +
+                        " fields but got " + std::to_string(st.exprs.size()));
+                }
+
+                const LocalInfo li = declare_struct_local_info(st.var_name, st.struct_name);
+
+                if (li.kind != LocalInfoKind::Struct) {
+                    throw std::runtime_error("Internal error: declared struct local is not Struct");
+                }
+                if (!li.struct_size_slots.has_value()) {
+                    throw std::runtime_error("Internal error: struct local missing size");
+                }
+                if (*li.struct_size_slots != static_cast<u32>(si.field_names.size())) {
+                    throw std::runtime_error("Internal error: struct local size does not match struct definition");
+                }
+
+                for (usize i = 0; i < st.exprs.size(); ++i) {
+                    build_expression(st.exprs[i]);
+                    emit(BytecodeStoreLocal{li.base_slot + static_cast<u32>(i)});
+                }
             },
             [&](const StructDeclarationStatement &) -> void {
                 std::unreachable();
@@ -469,13 +527,10 @@ void BytecodeBuilder::build(const std::vector<Statement> &program) {
 
     std::vector<const FunctionStatement *> funcs;
 
-    // pass 0: collect structs + functions
     for (const Statement &st : program) {
-        if (const auto *fs =
-                std::get_if<FunctionStatement>(&st.node)) {
+        if (const auto *fs = std::get_if<FunctionStatement>(&st.node)) {
             funcs.push_back(fs);
-        } else if (const auto *ss =
-                       std::get_if<StructStatement>(&st.node)) {
+        } else if (const auto *ss = std::get_if<StructStatement>(&st.node)) {
             if (struct_defs_.contains(ss->struct_name))
                 throw std::runtime_error(
                     "Duplicate struct: " + ss->struct_name);
@@ -491,7 +546,6 @@ void BytecodeBuilder::build(const std::vector<Statement> &program) {
         }
     }
 
-    // pass 1: assign function IDs
     for (const FunctionStatement *f : funcs) {
         if (func_ids_.contains(f->func_name))
             throw std::runtime_error(
@@ -512,7 +566,6 @@ void BytecodeBuilder::build(const std::vector<Statement> &program) {
     }
     entry_func_ = it->second;
 
-    // pass 2: compile bodies
     for (const FunctionStatement *f : funcs) {
         active_func_ = resolve_func(f->func_name);
 

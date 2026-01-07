@@ -37,7 +37,7 @@ int main() {
     using namespace ds_lang;
     // run_struct_example();
 
-    std::string code = load_code("examples/simple.ds");
+    std::string code = load_code("examples/struct.ds");
 
     std::vector<Token> tokens = Lexer{code}.tokenize_all();
     std::vector<Statement> program = Parser{tokens}.parse_program();

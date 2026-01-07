@@ -1,0 +1,8 @@
+func my_func() {
+    int x = 2;
+    return x;
+}
+
+func main() {
+    return my_func();
+}

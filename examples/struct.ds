@@ -1,11 +1,24 @@
-struct A {
+struct Vec3i {
     int x;
     int y;
     int z;
 }
 
+func len3(x, y, z) {
+    return x * x + y * y + z * z;
+}
+
+func dot3(x1, y1, z1, x2, y2, z2) {
+    return x1 * x2 + y1 * y2 + z1 * z2;
+}
+
 func main() {
-    A a = {1, -1, 2};
-    A b;
-    return a.x * (a.y + a.z);
+    Vec3i v1 = {1, -2, 3 * 2};
+    print "||v1||^2 = ";
+    print len3(v1.x, v1.y, v1.z);
+    Vec3i v2 = {3, 2, 5};
+    print "||v2||^2 = ";
+    print len3(v2.x, v2.y, v2.z);
+
+    return dot3(v1.x, v1.y, v1.z, v2.x, v2.y, v2.z);
 }
