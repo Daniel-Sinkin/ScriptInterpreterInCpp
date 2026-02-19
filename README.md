@@ -21,6 +21,20 @@ This repository is focused on compiler/interpreter fundamentals implemented from
 - Graphviz AST export (`.dot`) and rendered diagrams (`.png`).
 - Unit tests for lexer, parser, utility helpers, VM behavior, and bytecode generation.
 
+## AST visualizations
+
+### Collatz example (`examples/collatz.ds`)
+
+Implements `is_even`, `collatz`, and a `main` loop that repeatedly applies the Collatz step, prints each value, and exits when `x <= 1`.
+
+![Collatz AST](examples/collatz.png)
+
+### Struct example (`examples/struct.ds`)
+
+Defines a `Vec3i` struct, builds struct instances, uses field access (`v.x`, `v.y`, `v.z`), and computes vector math through helper functions.
+
+![Struct AST](examples/struct.png)
+
 ## Repository layout
 
 - `ds_lang/include`: core headers (lexer/parser/bytecode/vm).
@@ -172,12 +186,6 @@ VM Print: [1]
 VM PrintString: [Reached the end!]
 Return Value = 0
 ```
-
-## AST visualizations
-
-| Collatz AST | Struct AST |
-| --- | --- |
-| ![Collatz AST](examples/collatz.png) | ![Struct AST](examples/struct.png) |
 
 ## Build
 
