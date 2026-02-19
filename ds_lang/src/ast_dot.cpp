@@ -66,6 +66,18 @@ struct DotBuilder {
     std::vector<std::string> edges;
     NodeId next_id = 0;
 
+    NodeId add_styled_node(
+        std::string_view label,
+        std::string_view fillcolor,
+        std::string_view bordercolor,
+        std::string_view fontcolor = "#1f2937") {
+        const NodeId id = next_id++;
+        nodes.push_back(std::format(
+            "  n{} [label=\"{}\", shape=box, style=\"rounded,filled\", fillcolor=\"{}\", color=\"{}\", fontcolor=\"{}\"];\n",
+            id, escape_dot(label), fillcolor, bordercolor, fontcolor));
+        return id;
+    }
+
     static std::string escape_dot(std::string_view s) {
         std::string out;
         out.reserve(s.size());
@@ -94,33 +106,23 @@ struct DotBuilder {
     }
 
     NodeId add_node(std::string_view label) {
-        const NodeId id = next_id++;
-        nodes.push_back(std::format("  n{} [label=\"{}\"];\n", id, escape_dot(label)));
-        return id;
+        return add_styled_node(label, "#f4f7fb", "#c8d1dc");
+    }
+
+    NodeId add_root_node(std::string_view label) {
+        return add_styled_node(label, "#dbeafe", "#95b8e6", "#11253f");
     }
 
     NodeId add_identifier_node(std::string_view label) {
-        const NodeId id = next_id++;
-        nodes.push_back(std::format(
-            "  n{} [label=\"{}\", shape=box, style=filled, fillcolor=\"#e6f2ff\"];\n",
-            id, escape_dot(label)));
-        return id;
+        return add_styled_node(label, "#e6f4ff", "#8db8e0");
     }
 
     NodeId add_int_literal_node(std::string_view label) {
-        const NodeId id = next_id++;
-        nodes.push_back(std::format(
-            "  n{} [label=\"{}\", shape=box, style=filled, fillcolor=\"#fff2cc\"];\n",
-            id, escape_dot(label)));
-        return id;
+        return add_styled_node(label, "#fff3d6", "#e3bf78");
     }
 
     NodeId add_string_literal_node(std::string_view label) {
-        const NodeId id = next_id++;
-        nodes.push_back(std::format(
-            "  n{} [label=\"{}\", shape=box, style=filled, fillcolor=\"#f2f2f2\"];\n",
-            id, escape_dot(label)));
-        return id;
+        return add_styled_node(label, "#e9f7ef", "#8fc4ab");
     }
 
     void add_edge(NodeId from, NodeId to) {
@@ -304,14 +306,16 @@ struct DotBuilder {
         edges.clear();
         next_id = 0;
 
-        const NodeId root = add_node("PROGRAM");
+        const NodeId root = add_root_node("PROGRAM");
         for (const auto &st : program) {
             add_edge(root, emit_statement(st));
         }
 
         std::string out;
         out += "digraph AST {\n";
-        out += "  node [fontname=\"monospace\"];\n";
+        out += "  graph [bgcolor=\"#f9fbff\", pad=\"0.30\", nodesep=\"0.35\", ranksep=\"0.45\", splines=true];\n";
+        out += "  node [shape=box, style=\"rounded,filled\", fontname=\"Helvetica\", fontsize=11, color=\"#c8d1dc\", fillcolor=\"#f4f7fb\", fontcolor=\"#1f2937\", penwidth=1.2, margin=\"0.10,0.06\"];\n";
+        out += "  edge [color=\"#95a4b8\", penwidth=1.1, arrowsize=0.7];\n";
 
         for (const auto &n : nodes)
             out += n;
