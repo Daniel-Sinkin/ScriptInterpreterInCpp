@@ -92,7 +92,6 @@ static void test_int_declaration() {
 }
 
 static void test_int_assignment() {
-    // assignment statements are identifier-led: x = 123;
     const auto statements = parse_block("x = 123;");
     EXPECT_EQ(statements.size(), static_cast<std::size_t>(1));
 
@@ -294,7 +293,6 @@ static void test_function_statement_structure() {
 }
 
 static void test_nested_scope_statement_parsing() {
-    // Outer parse_block wraps this again, so this exercises parse_scope_statement().
     const auto statements = parse_block("{ print 1; }");
     EXPECT_EQ(statements.size(), static_cast<std::size_t>(1));
 

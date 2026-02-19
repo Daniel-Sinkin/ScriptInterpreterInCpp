@@ -196,12 +196,10 @@ std::unique_ptr<Expression> Parser::parse_expr_bp(int min_bp) {
                 error_here("Expected identifier after '.'");
             }
 
-            // Enforce no whitespace: lhs_end '.' field
             if (!adjacent_no_space(lhs_end_tok, dot_tok) || !adjacent_no_space(dot_tok, field_tok)) {
                 error_here("No whitespace allowed around '.' (use a.b)");
             }
 
-            // Enforce your “LHS must be identifier or access chain” rule:
             const bool ok_lhs =
                 std::holds_alternative<IdentifierExpression>(lhs->node) ||
                 std::holds_alternative<StructAccessExpression>(lhs->node);
@@ -221,7 +219,7 @@ std::unique_ptr<Expression> Parser::parse_expr_bp(int min_bp) {
             continue;
         }
 
-        if (k == TokenKind::LParen && kCallPrec >= min_bp) { // Handle postfix function calls
+        if (k == TokenKind::LParen && kCallPrec >= min_bp) {
             if (!std::holds_alternative<IdentifierExpression>(lhs->node)) {
                 error_here("Only identifiers can be called as functions");
             }
@@ -278,7 +276,6 @@ static std::unique_ptr<Expression> make_int_literal(i64 v) {
 }
 
 std::unique_ptr<Expression> Parser::nud(const Token &t) {
-    // prefix operators
     if (is_prefix(t.kind)) {
         const UnaryOp op = to_unary_op(t.kind);
         auto rhs = parse_expr_bp(80); // prefix binds tighter than any infix in our table
@@ -327,7 +324,6 @@ Statement Parser::parse_statement() {
     if (at_end())
         throw std::runtime_error("Trying to parse statement at the end");
 
-    // Enforce: no struct or func inside block scope.
     if (ctx_ != Context::TopLevel) {
         if (peek().kind == TokenKind::KWStruct) {
             error_here("struct is only allowed at global scope");
@@ -340,9 +336,6 @@ Statement Parser::parse_statement() {
     const TokenKind k = peek().kind;
 
     if (k == TokenKind::KWInt) {
-        // Decide between:
-        //   int x = expr;
-        //   int x;
         if (peek_kind(1) != TokenKind::Identifier) {
             error_here("Expected identifier after 'int'");
         }
@@ -412,8 +405,6 @@ std::vector<Statement> Parser::parse_program() {
 }
 
 std::vector<Statement> Parser::parse_scope() {
-    // Called for normal block scopes (function body, if/else, while, or standalone { }).
-    // Enforce block context.
     (void)consume(TokenKind::LBrace, "Scope parsing must start at '{'");
 
     const auto prev = ctx_;
@@ -523,7 +514,6 @@ IfStatement Parser::parse_if_statement() {
 }
 
 FunctionStatement Parser::parse_func_statement() {
-    // Must be top-level (enforced by parse_program)
     (void)consume(TokenKind::KWFunc, "Expected 'func'");
     std::string func_name{consume(TokenKind::Identifier, "Expected function name after 'func'").lexeme};
 
@@ -564,7 +554,6 @@ StructStatement Parser::parse_struct_statement() {
 
     (void)consume(TokenKind::LBrace, "Expected '{' to start struct body");
 
-    // Struct body parsing is custom: only "int <ident> ;" allowed.
     std::vector<std::string> vars;
     int guard = 0;
 
@@ -578,12 +567,10 @@ StructStatement Parser::parse_struct_statement() {
         (void)consume(TokenKind::KWInt, "Struct fields must start with 'int'");
         std::string field{consume(TokenKind::Identifier, "Expected field name").lexeme};
 
-        // No assignments inside struct for now.
         if (peek().kind == TokenKind::OpAssign) {
             error_here("Struct fields cannot have initializers");
         }
 
-        // Require at least one ';' (allows extra ';' via skip_eos in loop).
         (void)consume(TokenKind::Eos, "Expected ';' after struct field declaration");
 
         if (std::ranges::contains(vars, field)) {

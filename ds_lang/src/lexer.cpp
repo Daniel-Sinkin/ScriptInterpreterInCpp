@@ -1,3 +1,4 @@
+// ds_lang/src/lexer.cpp
 #include <format>
 #include <stdexcept>
 #include <string_view>
@@ -107,7 +108,7 @@ std::vector<Token> Lexer::tokenize_range(usize left, usize right) const {
                 new_line();
                 continue;
             }
-            if (c == '\r') { // \r\n is windows specific newline shenanigans
+            if (c == '\r') { // \r\n is windows specific newline
                 if (pos + 1 < right && code_[pos + 1] == '\n') {
                     ++pos;
                     new_line();

@@ -52,7 +52,6 @@ void VirtualMachine::reset() {
     call_stack_.push_back(std::move(entry));
     is_active_ = true;
 
-    // If entry has no code, halt immediately.
     if (f.code.empty()) {
         is_active_ = false;
     }
@@ -119,7 +118,6 @@ void VirtualMachine::do_call(u32 func_id, u32 argc) {
 
     std::vector<i64> args(static_cast<usize>(argc));
     for (usize i = 0; i < static_cast<usize>(argc); ++i) {
-        // Pop in reverse; last pushed argument is on top
         args[static_cast<usize>(argc) - 1 - i] = pop();
     }
 
@@ -134,15 +132,12 @@ void VirtualMachine::do_call(u32 func_id, u32 argc) {
 
     call_stack_.push_back(std::move(fr));
 
-    // If callee is empty, just treat as returning immediately.
     if (callee.code.empty()) {
         do_return();
     }
 }
 
 void VirtualMachine::do_return() {
-    // Return value convention: must have value on stack to return.
-    // (Keeps the VM simple and tests deterministic.)
     if (stack_.empty()) {
         throw std::runtime_error("VM return: missing return value on stack");
     }
@@ -156,12 +151,10 @@ void VirtualMachine::do_return() {
     call_stack_.pop_back();
 
     if (call_stack_.empty()) {
-        // Returned from entry => halt. Ret is discarded (or could be stored later).
         is_active_ = false;
         return;
     }
 
-    // Push return value to caller stack.
     push(ret);
 }
 
@@ -316,7 +309,6 @@ void VirtualMachine::step() {
     auto& fr = current_frame();
 
     if (fr.ip >= f.code.size()) {
-        // If we hit end of function without explicit return => error.
         throw std::runtime_error("VM: fell off end of function without return");
     }
 
@@ -324,9 +316,6 @@ void VirtualMachine::step() {
     fr.ip += 1;
 
     exec_op(op);
-
-    // Halt condition: entry frame still exists and finished via RETURN.
-    // (do_return() sets is_active_=false when popping last frame.)
 }
 
 void VirtualMachine::run() {

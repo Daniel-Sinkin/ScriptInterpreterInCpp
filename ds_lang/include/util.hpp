@@ -8,7 +8,8 @@
 #include "types.hpp"
 
 namespace ds_lang {
-// std::variant and std::visit magic helper to abe able to use multiple visitor lambdas
+// std::visit overload pattern for multiple lambdas.
+// Reference: https://en.cppreference.com/w/cpp/utility/variant/visit2
 template <class... Ts>
 struct overloaded : Ts... {
     using Ts::operator()...;

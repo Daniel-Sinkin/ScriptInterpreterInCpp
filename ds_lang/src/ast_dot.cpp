@@ -172,7 +172,6 @@ struct DotBuilder {
                           expr.node);
     }
 
-    // helper for vectors of statements (used by IF/WHILE/FUNC)
     NodeId emit_stmt_list(std::string_view label, const std::vector<Statement> &stmts) {
         const NodeId n = add_node(label);
         for (const auto &st : stmts) {
@@ -253,7 +252,6 @@ struct DotBuilder {
                 }
                 return n;
             } else if constexpr (std::is_same_v<T, StructDeclarationAssignmentStatement>) {
-                // e.g. MyStruct x = (exprs...)
                 const NodeId n = add_node("STRUCT_DECL_ASSIGN");
 
                 const NodeId type = add_node("TYPE");
@@ -271,7 +269,6 @@ struct DotBuilder {
                 }
                 return n;
             } else if constexpr (std::is_same_v<T, StructDeclarationStatement>) {
-                // e.g. MyStruct x;
                 const NodeId n = add_node("STRUCT_DECL");
 
                 const NodeId type = add_node("TYPE");
@@ -284,7 +281,6 @@ struct DotBuilder {
 
                 return n;
             } else if constexpr (std::is_same_v<T, StructAssignmentStatement>) {
-                // e.g. x = (exprs...)
                 const NodeId n = add_node("STRUCT_ASSIGN");
                 add_edge(n, add_identifier_node(s.var_name));
 

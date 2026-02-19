@@ -47,7 +47,6 @@ static void test_basic_two_lines() {
     EXPECT_TRUE(!tokens.empty());
     EXPECT_EQ(tokens.back().kind, TokenKind::Eof);
 
-    // int, x, =, 1, ;, print, x, EOF
     EXPECT_EQ(tokens.size(), static_cast<std::size_t>(8));
 
     expect_token(tokens[0], TokenKind::KWInt, "int", 0, 0);
@@ -70,7 +69,6 @@ static void test_hspace_skipping() {
     EXPECT_TRUE(!tokens.empty());
     EXPECT_EQ(tokens.back().kind, TokenKind::Eof);
 
-    // int, x, =, 42, ;, print, x, EOF
     EXPECT_EQ(tokens.size(), static_cast<std::size_t>(8));
 
     EXPECT_EQ(tokens[0].kind, TokenKind::KWInt);
@@ -125,8 +123,6 @@ static void test_multiple_blank_lines() {
 }
 
 static void test_invalid_digit_throws() {
-    // With the current lexer rules, a numeric token is a run of digits.
-    // If an unexpected character follows (e.g. '$'), lexing must fail there.
     EXPECT_THROW(lex("int x = 12$;"));
 }
 
@@ -153,13 +149,11 @@ static void test_eof_only_once_and_at_end() {
 static void test_tokenize_range_absolute_line_col() {
     const std::string code = "int x = 1;print x";
 
-    // indices: ';' at 9, 'p' at 10
     const auto tokens = lex_range(code, 10, code.size());
 
     EXPECT_TRUE(!tokens.empty());
     EXPECT_EQ(tokens.back().kind, TokenKind::Eof);
 
-    // print, x, EOF
     EXPECT_EQ(tokens.size(), static_cast<std::size_t>(3));
     expect_token(tokens[0], TokenKind::KWPrint, "print", 1, 0);
     expect_token(tokens[1], TokenKind::Identifier, "x", 1, 6);
@@ -233,12 +227,10 @@ static void test_delimiters_and_bang() {
 }
 
 static void test_single_ampersand_throws() {
-    // Only && is valid; a lone '&' is an unexpected character.
     EXPECT_THROW(lex("print x & y;"));
 }
 
 static void test_single_pipe_throws() {
-    // Only || is valid; a lone '|' is an unexpected character.
     EXPECT_THROW(lex("print x | y;"));
 }
 

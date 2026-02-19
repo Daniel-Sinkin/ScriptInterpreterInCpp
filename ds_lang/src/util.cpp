@@ -47,12 +47,10 @@ string_to_i64(std::string_view word) noexcept {
         sign = -1;
         i = 1;
     } else if (word[0] == '+') {
-        // tests expect "+1" to be invalid
         return std::unexpected{E::InvalidDigit};
     }
 
     if (i >= word.size()) {
-        // just "-" (no digits)
         return std::unexpected{E::InvalidDigit};
     }
 
@@ -61,7 +59,7 @@ string_to_i64(std::string_view word) noexcept {
     }
 
     const u64 pos_limit = static_cast<u64>(std::numeric_limits<i64>::max());
-    const u64 neg_limit = pos_limit + 1ULL; // 9223372036854775808
+    const u64 neg_limit = pos_limit + 1ULL;
     const u64 limit = (sign < 0) ? neg_limit : pos_limit;
 
     u64 acc = 0;
@@ -72,7 +70,6 @@ string_to_i64(std::string_view word) noexcept {
 
         const u64 d = static_cast<u64>(c - '0');
 
-        // overflow check: acc*10 + d <= limit
         if (acc > (limit - d) / 10ULL)
             return std::unexpected{E::Overflow};
 

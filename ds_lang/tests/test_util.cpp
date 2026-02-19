@@ -26,12 +26,10 @@ static void test_empty() {
 }
 
 static void test_single_zero_ok() {
-    // Only fails if you disallow "0" entirely; most implementations accept it.
     expect_ok("0", 0);
 }
 
 static void test_starts_with_zero() {
-    // Assumes your implementation forbids leading zeros for multi-digit numbers.
     expect_err("01", ds_lang::StringToIntError::StartsWithZero);
     expect_err("000", ds_lang::StringToIntError::StartsWithZero);
 }
@@ -51,17 +49,14 @@ static void test_ok_small_values() {
 }
 
 static void test_int64_max_ok() {
-    // i64 is std::int64_t per your types.hpp
     constexpr auto max_str = "9223372036854775807";
     expect_ok(max_str, std::numeric_limits<ds_lang::i64>::max());
 }
 
 static void test_overflow() {
-    // One above INT64_MAX
     constexpr auto overflow_str = "9223372036854775808";
     expect_err(overflow_str, ds_lang::StringToIntError::Overflow);
 
-    // Obviously too large
     expect_err("999999999999999999999999999999999999", ds_lang::StringToIntError::Overflow);
 }
 
